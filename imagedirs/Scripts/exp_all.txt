@@ -1,0 +1,35 @@
+# exp_all.txt
+#
+# top-level script-file for experiments in IJCV taxonomy paper
+
+# This script file lives in the subdirectory imagedirs/Scripts
+# and sequences through the datasets
+
+# edit this file to select which data sets to use
+
+# edit the script 'exp_dispatch.txt' to select which experiments to run
+
+verbose 2       # just the summary
+
+  # Map image pair(formerly triclops / "Microsoft")
+  # black/white, 2 images; two planes, highy textured everywhere
+cd ../map
+script ../Scripts/exp_dispatch.txt
+
+  # Sawtooth sequence (formerly seq11)
+  # 3 planes, frontal plane is slanted and has sawtooth shape
+  # color, 9 images (0..8), use 2 and 6
+cd ../sawtooth
+script ../Scripts/exp_dispatch.txt
+
+  # University of Tsukuba "Lamp" sequence with manually established ground truth
+  # used by permission
+  # color, 5 images (1..5), use 3 and 4 
+cd ../tsukuba
+script ../Scripts/exp_dispatch.txt
+
+  # Venus sequence (formerly seq9)
+  # 5 planes, some slant, untextured regions, one crease
+  # color, 9 images (0..8), use 2 and 6
+cd ../venus
+script ../Scripts/exp_dispatch.txt
