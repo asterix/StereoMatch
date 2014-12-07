@@ -142,8 +142,16 @@
     <ClInclude Include="Warp1D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="StcRawCost.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="README-StereoMatch.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="StcRawCost.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

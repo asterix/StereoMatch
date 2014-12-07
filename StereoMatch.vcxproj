@@ -83,6 +83,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <BrowseInformation Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</BrowseInformation>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -91,6 +92,9 @@
     <CudaCompile>
       <Runtime>MTd</Runtime>
     </CudaCompile>
+    <Bscmake>
+      <PreserveSbr Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</PreserveSbr>
+    </Bscmake>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
@@ -146,6 +150,7 @@
     <ClInclude Include="MinFilter.h" />
     <ClInclude Include="ParameterIO.h" />
     <ClInclude Include="RefCntMem.h" />
+    <ClInclude Include="StcRawCost.h" />
     <ClInclude Include="StereoIO.h" />
     <ClInclude Include="StereoMatcher.h" />
     <ClInclude Include="StereoParameters.h" />
@@ -154,6 +159,9 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="README-StereoMatch.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="StcRawCost.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
