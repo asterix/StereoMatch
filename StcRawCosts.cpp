@@ -56,158 +56,7 @@
 
 #include "StcRawCost.h"
 
-static void InterpolateLine(int buf[], int s, int w, int nB,
-                            EStereoInterpFn match_interp)     // interpolation function
-{
-    // Interpolate the missing values
-    float si = 1.0f / s;
-    for (int x = 0; x < w-1; x++)
-    {
-        for (int b = 0; b < nB; b++)
-        {
-            int *v = &buf[s*x*nB+b];
-            float I0 = v[0];
-            float I1 = v[s*nB];
-            if (match_interp == eCubic) // cubic interpolation
-            {
-                float Im = (x > 0) ? v[-s*nB] :
-                           (I0 - (I1 - I0));  // extend linearly
-                float Ip = (x+1 < w-1) ? v[2*s*nB] :
-                           (I1 + (I1 - I0));  // extend linearly
-                float sf = si;
-                for (int is = 1; is < s; is++, sf += si)
-                {
-                    v  += nB;
-                    float Ii = CubicInterpolate(sf, Im, I0, I1, Ip);
-                    v[0] = int(Ii);
-                }
-            }
-            else  // linear interpolation
-            {
-                float d = (I1 - I0) / (float) s;
-                for (int is = 1; is < s; is++)
-                {
-                    v  += nB;
-                    I0 += d;
-                    v[0] = int(I0);
-                }
-            }
-        }
-    }
-}
-
-static void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf,
-                                   const int w, const int b)
-{
-    // Compute for every (interpolated) pixel, the minimum and maximum
-    //  values in the two half-intervals before and after it
-    //  (see [Birchfield & Tomasi, PAMI 20(40), April 1998, p. 401]).
-
-    // Process each band separaterly
-    for (int k = 0; k < b; k++)
-    {
-        int Ir = buffer[k], b1 = buffer[k];
-        for (int x = 0, l = k; x < w; x++, l += b)
-        {
-            int Il = Ir, b0 = b1;   // shift down previously computed values
-            if (x < w-1)
-                b1 = buffer[l+b];
-            Ir = (b0 + b1 + 1)/2;   // interpolated half-value
-            min_buf[l] = __min(Il, __min(b0, Ir));
-            max_buf[l] = __max(Il, __max(b0, Ir));
-        }
-    }
-}
-
-static void MatchLine(int w, int b, int interpolated,
-                      int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
-                      int mmn[], int mmx[],     // min/max of mtc (mtc if mmx == 0)
-                      float cost[],
-                      int m_disp_n, int disp, int disp_den,
-                      EStereoMatchFn match_fn,  // matching function
-                      int match_max,            // maximum difference for truncated SAD/SSD
-                      float match_outside)        // special value for outside match
-{
-    // Set up the starting addresses, pointers, and cutoff value
-    int n = (w-1)*disp_den + 1;             // number of reference pixels
-    int s = (interpolated) ? 1 : disp_den;     // skip in reference pixels
-    std::vector<float> cost1;
-    cost1.resize(n);
-    int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
-    // TODO:  cutoff is not adjusted for the number of bands...
-    const float bad_cost = -1;
-
-    // Match valid pixels
-    float  left_cost = bad_cost;
-    float right_cost = bad_cost;
-    int x, y;
-    for (x = 0; x < n; x += s)
-    {
-        // Compute ref and match pointers
-        cost1[x] = bad_cost;
-        int x_r = x, x_m = x + disp;
-        if (x_m < 0 || x_m >= n)
-            continue;
-        int* rn = &rmn[x_r*b];    // pointer to ref or min pixel(s)
-        int* rx = &rmx[x_r*b];    // pointer to ref    max pixel(s)
-        int* mn = &mmn[x_m*b];    // pointer to mtc or min pixel(s)
-        int* mx = &mmx[x_m*b];    // pointer to mtc    max pixel(s)
-        int  diff_sum = 0;        // accumulated error
-
-        // This code could be special-cased for b==1 for more efficiency...
-        for (int ib = 0; ib < b; ib++)
-        {
-            int diff1 = mn[ib] - rn[ib];    // straightforward difference
-            if (rmx && mmx)
-            {
-                // Compare intervals (see partial shuffle code in StcEvaluate.cpp)
-                int xn = __max(rn[ib], mn[ib]);     // max of mins
-                int nx = __min(rx[ib], mx[ib]);     // min of maxs
-                if (xn <= nx)
-                    diff1 = 0;          // overlapping ranges -> no error
-                else
-                    diff1 = (mn[ib] > rx[ib]) ?     // check sign
-                            mn[ib]-rx[ib] : 
-                            rn[ib]-mx[ib];          // gap between intervals
-            }
-            int diff2 = (match_fn == eSD) ?    // squared or absolute difference
-                            diff1 * diff1 : abs(diff1);
-            diff_sum += diff2;
-        }
-        int diff3 = __min(diff_sum, cutoff);    // truncated difference
-        if (left_cost == bad_cost)
-            left_cost = diff3;  // first cost computed
-        right_cost = diff3;     // last  cost computed
-        cost1[x] = diff3;        // store in temporary array
-    }
-
-    // Fill in the left and right edges
-    if (undefined_cost)
-        left_cost = right_cost = match_outside;
-    for (x = 0  ; x <  n && cost1[x] == bad_cost; x += s)
-        cost1[x] = left_cost;
-    for (x = n-1; x >= 0 && cost1[x] == bad_cost; x -= s)
-        cost1[x] = right_cost;
-
-    // Box filter if interpolated costs
-    int dh = disp_den / 2;
-    float box_scale = 1.0 / (2*dh + 1);
-    for (x = 0, y = 0; y < w*m_disp_n; x += disp_den, y += m_disp_n)
-    {
-        if (interpolated && disp_den > 1)
-        {
-            float sum = 0;
-            for (int k = -dh; k <= dh; k++)
-            {
-                int l = __max(0, __min(n-1, x+k));  // TODO: make more efficient
-                sum += cost1[l];
-            }
-            cost[y] = int(box_scale * sum + 0.5);
-        }
-        else
-            cost[y] = cost1[x];
-    }
-}
+#define OPT1
 
 static int gcd(int a, int b)
 {
@@ -218,6 +67,45 @@ static int gcd(int a, int b)
     return gcd(b, a % b);
 }
 
+#ifdef OPT1
+void CStereoMatcher::RawCosts()
+{
+    StartTiming();
+
+    // Compute raw per-pixel matching score between a pair of frames
+    CShape sh = m_reference.Shape();
+    int w = sh.width, h = sh.height, b = sh.nBands;
+
+    if (verbose >= eVerboseProgress)
+        fprintf(stderr, "- computing costs: ");
+    if (verbose >= eVerboseSummary) {
+        fprintf(stderr, match_fn == eAD ? "AD" : (match_fn == eSD ? "SD" : "???"));
+        if (m_disp_step != 1.0f)
+            fprintf(stderr, ", step=%g", m_disp_step);
+        if (match_max < 1000)
+            fprintf(stderr, ", trunc=%d", match_max);
+        if (match_interval)
+            fprintf(stderr, ", interval");
+        if (match_interpolated)
+            fprintf(stderr, ", interpolated");
+    }
+    if (verbose >= eVerboseProgress)
+        fprintf(stderr, "\n");
+    
+
+
+    // cuda function call
+    LineProcess(m_reference, m_matching, m_cost,
+        m_disp_den, m_disp_n, b, w, h, match_interp, &match_interval, match_interpolated,
+        m_frame_diff_sign, disp_min, m_disp_num, match_fn, match_max, &m_match_outside);
+
+    PrintTiming();
+
+    // Write out the different disparity images
+    if (verbose >= eVerboseDumpFiles)
+        WriteCosts(m_cost, "reprojected/RAW_DSI_%03d.pgm");
+}
+#else
 void CStereoMatcher::RawCosts()
 {
     StartTiming();
@@ -310,8 +198,10 @@ void CStereoMatcher::RawCosts()
                 (match_interval) ? (match_interpolated) ? max0 : buf0 : 0,
                 (match_interval) ? min1 : buf1,
                 (match_interval) ? max1 : 0,
-                cost, m_disp_n, disp, m_disp_den,
-                match_fn, match_max, m_match_outside);
+                cost,
+                m_disp_n, disp, m_disp_den,
+                match_fn,
+                match_max, m_match_outside);
         }
     }
     PrintTiming();
@@ -320,6 +210,7 @@ void CStereoMatcher::RawCosts()
     if (verbose >= eVerboseDumpFiles)
         WriteCosts(m_cost, "reprojected/RAW_DSI_%03d.pgm");
 }
+#endif
 
 static void PadLine(int w, int b, float cost[],
                     int m_disp_n, int disp, int disp_den,
