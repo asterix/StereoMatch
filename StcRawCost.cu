@@ -73,9 +73,9 @@ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf_d, int* max_buf_d, c
 
 
 void MatchLine(int w, int b, int interpolated,
-    int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
-    int mmn[], int mmx[],     // min/max of mtc (mtc if mmx == 0)
-    float cost[],
+    int* rmn, int* rmx,     // min/max of ref (ref if rmx == 0)
+    int* mmn, int* mmx,     // min/max of mtc (mtc if mmx == 0)
+    float* cost,
     int m_disp_n, int disp, int disp_den,
     EStereoMatchFn match_fn,  // matching function
     int match_max,            // maximum difference for truncated SAD/SSD
@@ -87,9 +87,7 @@ void MatchLine(int w, int b, int interpolated,
     // Set up the starting addresses, pointers, and cutoff value
     int n = (w - 1)*disp_den + 1;             // number of reference pixels
     int s = (interpolated) ? 1 : disp_den;     // skip in reference pixels
-    std::vector<float> cost1;
-    cost1.resize(n);
-    float* cost1_ptr = (float*)&cost1[0];
+    float* cost1 = (float*)malloc(n*sizeof(float));
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
     // TODO:  cutoff is not adjusted for the number of bands...
     const float bad_cost = -1;
@@ -101,7 +99,7 @@ void MatchLine(int w, int b, int interpolated,
     float  left_cost = bad_cost;
     float right_cost = bad_cost;
 
-    MatchPixels(w, b, interpolated, rmn, rmx, mmn, mmx, cost1_ptr, disp, match_fn, n, s, cutoff, match_interval, match_interpolated, buffer_length, cost1_length);
+    MatchPixels(w, b, interpolated, rmn, rmx, mmn, mmx, cost1, disp, match_fn, n, s, cutoff, match_interval, match_interpolated, buffer_length, cost1_length);
 
     // left & right cost search
     for (int x = 0; x < n; x++)
@@ -131,7 +129,7 @@ void MatchLine(int w, int b, int interpolated,
         cost1[x] = right_cost;
 
     // Box filter if interpolated costs
-    BoxFilter(cost1_ptr, cost, n, w, m_disp_n, disp_den, interpolated, cost1_length, cost_length);
+    BoxFilter(cost1, cost, n, w, m_disp_n, disp_den, interpolated, cost1_length, cost_length);
 }
 
 
@@ -208,7 +206,7 @@ void MatchPixels(int w, int b, int interpolated,
     int cost1_length)
 {
     dim3 gridSize, blockSize(BLOCKSIZE, 1, 1);
-    gridSize.x = (unsigned int)ceil((float)(w*b) / (float)blockSize.x);
+    gridSize.x = (unsigned int)ceil((float)(cost1_length) / (float)blockSize.x);
 
     float* cost1_d; // length n
     int* rmn_d;
@@ -258,7 +256,7 @@ void MatchPixels(int w, int b, int interpolated,
         mmx_d = mmx; // null
     }
 
-    MatchPixelsKernel<<<gridSize, blockSize>>>(w, b, interpolated, rmn, rmx, mmn, mmx, cost1_d, disp, match_fn, n, s, cutoff, buffer_length, cost1_length);
+    MatchPixelsKernel<<<gridSize, blockSize>>>(w, b, interpolated, rmn_d, rmx_d, mmn_d, mmx_d, cost1_d, disp, match_fn, n, s, cutoff, buffer_length, cost1_length);
     cudaDeviceSynchronize();
 
     // Copy output back to host
@@ -329,7 +327,7 @@ void BoxFilter(float* cost1, float* cost, int n, int w, int m_disp_n, int disp_d
 
     cudaMemcpy(cost1_d, cost1, cost1_length*sizeof(float), cudaMemcpyHostToDevice);
 
-    BoxFilterKernel<<<gridSize, blockSize>>>(cost1, cost, n, w, m_disp_n, disp_den, interpolated, cost1_length, cost_length);
+    BoxFilterKernel<<<gridSize, blockSize>>>(cost1_d, cost_d, n, w, m_disp_n, disp_den, interpolated, cost1_length, cost_length);
     cudaDeviceSynchronize();
 
     cudaMemcpy(cost, cost_d, cost_length*sizeof(float), cudaMemcpyDeviceToHost);

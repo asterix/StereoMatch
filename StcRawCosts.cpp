@@ -311,8 +311,7 @@ void CStereoMatcher::RawCosts()
                 (match_interval) ? min1 : buf1,
                 (match_interval) ? max1 : 0,
                 cost, m_disp_n, disp, m_disp_den,
-                match_fn, match_max, m_match_outside,
-                match_interval, match_interpolated, buffer_length);
+                match_fn, match_max, m_match_outside);
         }
     }
     PrintTiming();
