@@ -12,6 +12,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef VERBOSE_H
+#define VERBOSE_H
 
 enum EVerbosityLevel
 {
@@ -27,3 +29,5 @@ enum EVerbosityLevel
     eVerboseDumpFiles       = 25,  // dump intermediate results as image files
     eVerboseAllMessages     = 99   // include all information
 };
+
+#endif

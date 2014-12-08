@@ -32,6 +32,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef STEREOMATCHER_H
+#define STEREOMATCHER_H
 
 #include "Image.h"
 #include "StereoParameters.h"
@@ -165,3 +167,5 @@ protected:
 
     std::vector<CStereoFrame> m_frame;  // input/output images
 };
+
+#endif

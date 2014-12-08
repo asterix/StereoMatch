@@ -45,6 +45,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef STEREO_IO_H
+#define STEREO_IO_H
 
 #include "StereoMatcher.h"
 
@@ -118,3 +120,5 @@ private:
     CStereoFrameDescriptor m_fd0;    // reference input/output frame descriptor
     std::vector<CStereoFrameDescriptor> m_fd;   // list of frame descriptors
 };
+
+#endif

@@ -29,6 +29,7 @@
 #include "Error.h"
 #include "Convert.h"
 #include "Convolve.h"
+#include "CudaConvolve.h"
 
 static int TrimIndex(int k, EBorderMode e, int n)
 {
@@ -123,6 +124,7 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     if (sShape.width * sShape.height * sShape.nBands == 0)
         return;
     CFloatImage output(CShape(sShape.width, 1, sShape.nBands));
+    CFloatImage output1(CShape(sShape.width, 1, sShape.nBands));
 
     // Fill up the row buffer initially
     for (int k = 0; k < kShape.height; k++)
@@ -142,6 +144,9 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
         // Do the convolution
         ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0),
                       sShape.width);
+
+        // Convolve on GPU
+        CudaConvolve2DRow(buffer, kernel, &output1.Pixel(0, 0, 0), sShape.width);
 
         // Scale, offset, and type convert
         ScaleAndOffsetLine(&output.Pixel(0, 0, 0), &dst.Pixel(0, y, 0),

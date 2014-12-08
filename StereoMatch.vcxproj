@@ -131,6 +131,7 @@
     <ClCompile Include="StereoIO.cpp" />
     <ClCompile Include="StereoMatcher.cpp" />
     <ClCompile Include="StereoParameters.cpp" />
+    <ClCompile Include="vectoradd_gold.cpp" />
     <ClCompile Include="Warp1D.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -138,6 +139,8 @@
     <ClInclude Include="Convert.h" />
     <ClInclude Include="Convolve.h" />
     <ClInclude Include="Copyright.h" />
+    <ClInclude Include="CudaConvolve.h" />
+    <ClInclude Include="CudaUtilities.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="Histogram1D.h" />
     <ClInclude Include="Image.h" />
@@ -149,11 +152,17 @@
     <ClInclude Include="StereoIO.h" />
     <ClInclude Include="StereoMatcher.h" />
     <ClInclude Include="StereoParameters.h" />
+    <ClInclude Include="vectoradd.h" />
     <ClInclude Include="Verbose.h" />
     <ClInclude Include="Warp1D.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="README-StereoMatch.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="CudaConvolve.cu" />
+    <CudaCompile Include="CudaUtilities.cu" />
+    <CudaCompile Include="vectoradd.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

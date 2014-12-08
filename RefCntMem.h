@@ -21,6 +21,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef REFCNTMEM_H
+#define REFCNTMEM_H
 
 struct CRefCntMemPtr         // shared component of reference counted memory
 {
@@ -51,3 +53,5 @@ private:
     CRefCntMemPtr *m_ptr;       // shared reference-counted memory pointer
 };
 
+
+#endif
