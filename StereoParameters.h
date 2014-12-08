@@ -25,6 +25,9 @@
 #include "ParameterIO.h"
 #include "Verbose.h"
 
+#ifndef STEREOPARAMETERS_H
+#define STEREOPARAMETERS_H
+
 //  Note:  we could also fold all of the parameters into a single struct,
 //      if that turns out to be easier for people to follow...
 
@@ -267,3 +270,4 @@ struct CStereoParameters : public
         // Initialize parameter input/output object
 };
 
+#endif

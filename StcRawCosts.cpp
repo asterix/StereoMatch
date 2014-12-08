@@ -54,6 +54,8 @@
 #include "Warp1D.h"
 #include <time.h>
 
+#include "StcRawCost.h"
+
 static void InterpolateLine(int buf[], int s, int w, int nB,
                             EStereoInterpFn match_interp)     // interpolation function
 {
@@ -116,8 +118,6 @@ static void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf
         }
     }
 }
-
-static bool undefined_cost = true;     // set this to true to pad with outside_cost
 
 static void MatchLine(int w, int b, int interpolated,
                       int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
@@ -227,7 +227,7 @@ void CStereoMatcher::RawCosts()
     int w = sh.width, h = sh.height, b = sh.nBands;
 
     if (verbose >= eVerboseProgress)
-        fprintf(stderr, "- computing costs: "); 
+        fprintf(stderr, "- computing costs: ");
     if (verbose >= eVerboseSummary) {
         fprintf(stderr, match_fn == eAD ? "AD" : (match_fn == eSD ? "SD" : "???"));
         if (m_disp_step != 1.0f)
@@ -246,7 +246,7 @@ void CStereoMatcher::RawCosts()
     //  Note that we don't have to interpolate the ref image if we
     //  aren't using match_interpolated, but it's simpler to code this way.
     match_interval = (match_interval ? 1 : 0);  // force to [0,1]
-    int n_interp = m_disp_den * (w-1) + 1;
+    int n_interp = m_disp_den * (w - 1) + 1;
     std::vector<int> buffer0, buffer1, min_bf0, max_bf0, min_bf1, max_bf1;
     buffer0.resize(n_interp * b);
     buffer1.resize(n_interp * b);
@@ -255,10 +255,12 @@ void CStereoMatcher::RawCosts()
     min_bf1.resize(n_interp * b);
     max_bf1.resize(n_interp * b);
 
+    int buffer_length = n_interp * b;
+
     // Special value for border matches
     int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
-	m_match_outside = __min(worst_match, cutoff);	// trim to cutoff
+    m_match_outside = __min(worst_match, cutoff);	// trim to cutoff
 
     // Process all of the lines
     for (int y = 0; y < h; y++)
@@ -278,8 +280,8 @@ void CStereoMatcher::RawCosts()
         {
             for (int k = 0; k < b; k++, l++)
             {
-                buf0[m+k] = ref[l];
-                buf1[m+k] = mtc[l];
+                buf0[m + k] = ref[l];
+                buf1[m + k] = mtc[l];
             }
         }
 
@@ -289,10 +291,12 @@ void CStereoMatcher::RawCosts()
             InterpolateLine(buf1, m_disp_den, w, b, match_interp);
             InterpolateLine(buf0, m_disp_den, w, b, match_interp);
         }
+
+        // Parallelized
         if (match_interval) {
-            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b);
+            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b, buffer_length);
             if (match_interpolated)
-                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b);
+                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b, buffer_length);
         }
 
         // Compute the costs, one disparity at a time
@@ -300,13 +304,15 @@ void CStereoMatcher::RawCosts()
         {
             float* cost = &m_cost.Pixel(0, y, k);
             int disp = -m_frame_diff_sign * (m_disp_den * disp_min + k * m_disp_num);
+            // Parallelized
             MatchLine(w, b, match_interpolated,
-                      (match_interval) ? (match_interpolated) ? min0 : buf0 : buf0,
-                      (match_interval) ? (match_interpolated) ? max0 : buf0 : 0,
-                      (match_interval) ? min1 : buf1,
-                      (match_interval) ? max1 : 0,
-                      cost, m_disp_n, disp, m_disp_den,
-                      match_fn, match_max, m_match_outside);
+                (match_interval) ? (match_interpolated) ? min0 : buf0 : buf0,
+                (match_interval) ? (match_interpolated) ? max0 : buf0 : 0,
+                (match_interval) ? min1 : buf1,
+                (match_interval) ? max1 : 0,
+                cost, m_disp_n, disp, m_disp_den,
+                match_fn, match_max, m_match_outside,
+                match_interval, match_interpolated, buffer_length);
         }
     }
     PrintTiming();

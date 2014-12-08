@@ -27,6 +27,9 @@
 
 #include <vector>
 
+#ifndef PARAMETERIO_H
+#define PARAMETERIO_H
+
 struct CParameterPair {
     char* name;         // name string
     char* format;       // format string
@@ -53,3 +56,5 @@ protected:
 #define PPPF(x)  PushParamPair(#x, "%f", &x)
 #define PPPD(x)  PushParamPair(#x, "%d", &x)
 #define PPPH(v)  PushParamPair(#v, "0x%08x", &v)
+
+#endif

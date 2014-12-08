@@ -13,6 +13,9 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#ifndef VERBOSE_H
+#define VERBOSE_H
+
 enum EVerbosityLevel
 {
     eVerboseQuiet           = 0,   // no output except for errors
@@ -27,3 +30,5 @@ enum EVerbosityLevel
     eVerboseDumpFiles       = 25,  // dump intermediate results as image files
     eVerboseAllMessages     = 99   // include all information
 };
+
+#endif
