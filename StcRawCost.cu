@@ -22,19 +22,8 @@ __global__ void BirchfieldTomasiMinMaxKernel(const int* buffer, int* min_buf, in
     //  values in the two half-intervals before and after it
     //  (see [Birchfield & Tomasi, PAMI 20(40), April 1998, p. 401]).
 
-    __shared__ int buffer_s[BLOCKSIZE];
-
     unsigned k = threadIdx.x + blockIdx.x * blockDim.x;
     //unsigned x = threadIdx.y + blockIdx.y * blockDim.y;
-
-    if (k < b)
-    {
-        for (int x = 0, l = k; x < w; x++, l += b)
-        {
-            buffer_s[l] = buffer[l];
-        }
-    }
-    __syncthreads();
 
     // Process each band separately
     if (k < b)
@@ -52,23 +41,29 @@ __global__ void BirchfieldTomasiMinMaxKernel(const int* buffer, int* min_buf, in
     }
 }
 
-void BirchfieldTomasiMinMax(const int* buffer, int* min_buf_d, int* max_buf_d, const int w, const int b, int buffer_length)
+void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b, int buffer_length)
 {
     dim3 gridSize, blockSize(BLOCKSIZE, 1, 1);
-    gridSize.x = (unsigned int)ceil((float)(w*b) / (float)blockSize.x);
+    gridSize.x = (unsigned int)ceil((float)(buffer_length) / (float)blockSize.x);
 
     int* buffer_d;
+    int* min_buf_d;
+    int* max_buf_d;
 
     cudaMalloc(&min_buf_d, buffer_length*sizeof(int));
     cudaMalloc(&max_buf_d, buffer_length*sizeof(int));
     cudaMalloc(&buffer_d, buffer_length*sizeof(int));
 
-    cudaMemcpy(buffer_d, buffer, w*b*sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(buffer_d, buffer, buffer_length*sizeof(int), cudaMemcpyHostToDevice);
 
     BirchfieldTomasiMinMaxKernel<<<gridSize, blockSize>>>(buffer_d, min_buf_d, max_buf_d, w, b, buffer_length);
     cudaDeviceSynchronize();
 
-    // Don't copy anything back since next call to MatchLine is parallelized
+    cudaMemcpy(min_buf, min_buf_d, buffer_length*sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(max_buf, max_buf_d, buffer_length*sizeof(int), cudaMemcpyDeviceToHost);
+    cudaFree(min_buf_d);
+    cudaFree(max_buf_d);
+    cudaFree(buffer_d);
 }
 
 

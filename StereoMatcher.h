@@ -124,6 +124,9 @@ protected:
     void StartTiming();                 // start timing evaluation
     void PrintTiming();                 // print the elapsed time
 
+    float* RawCostCpu();
+    float* RawCostGpu();
+
     static void WriteCosts(CFloatImage& cost, char *filename);
 public:
     static void ComputeEnergy(CFloatImage& dcost, CFloatImage& ncost, 

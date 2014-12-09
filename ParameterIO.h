@@ -29,9 +29,6 @@
 
 #include <vector>
 
-#ifndef PARAMETERIO_H
-#define PARAMETERIO_H
-
 struct CParameterPair {
     char* name;         // name string
     char* format;       // format string

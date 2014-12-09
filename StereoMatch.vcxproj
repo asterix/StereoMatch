@@ -149,6 +149,7 @@
     <ClInclude Include="MinFilter.h" />
     <ClInclude Include="ParameterIO.h" />
     <ClInclude Include="RefCntMem.h" />
+    <ClInclude Include="StcRawCost.h" />
     <ClInclude Include="StereoIO.h" />
     <ClInclude Include="StereoMatcher.h" />
     <ClInclude Include="StereoParameters.h" />
@@ -162,6 +163,7 @@
   <ItemGroup>
     <CudaCompile Include="CudaConvolve.cu" />
     <CudaCompile Include="CudaUtilities.cu" />
+    <CudaCompile Include="StcRawCost.cu" />
     <CudaCompile Include="vectoradd.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
