@@ -47,6 +47,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef HISTOGRAM1D_H
+#define HISTOGRAM1D_H
 
 template <class T>
 int  Histogram1D(CImageOf<T> img, int n_bands, CByteImage mask,
@@ -58,3 +60,5 @@ void Histogram1D(CImageOf<T> img, int n_bands, CByteImage mask,
                  CByteImage& figure,
                  float& min_val, float& max_val, float& step_size, int& n_bins,
                  int& height, float& v_scale);
+
+#endif

@@ -22,6 +22,10 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef IMAGE_IO_H
+#define IMAGE_IO_H
 
 void ReadImage (CImage& img, const char* filename);
 void WriteImage(CImage& img, const char* filename);
+
+#endif

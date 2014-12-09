@@ -44,6 +44,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef CONVOLVE_H
+#define CONVOLVE_H
 
 template <class T>
 void Convolve(CImageOf<T> src, CImageOf<T>& dst,
@@ -60,3 +62,5 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
 extern CFloatImage ConvolveKernel_121;
 extern CFloatImage ConvolveKernel_14641;
 extern CFloatImage ConvolveKernel_8TapLowPass;
+
+#endif

@@ -24,6 +24,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef PARAMETER_IO_H
+#define PARAMETER_IO_H
 
 #include <vector>
 
