@@ -6,6 +6,10 @@
 // This file contains helper functions for kernel/wrapper implementations
 //
 //
+// Use GPUERRORCHECK to verify successful completion of CUDA calls
+//
+// Created: 3-Dec-2014
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CudaUtilities.h"
@@ -13,16 +17,6 @@
 Timer *profilingTimer;
 Timer *profilingTimer2;
 
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
-{
-    if (code != cudaSuccess)
-    {
-        fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        //if (abort) exit(code);
-    }
-}
 
 //Timer methods
 void 
@@ -42,28 +36,28 @@ Timer::stopAndGetTimerValue()
 
 
 // GPU memory handling functions
-
 // Alloc device memory and set to 0
 void
 AllocateGPUMemory(void** ptr, unsigned int total_size, bool clear)
 {
-   cudaMalloc(ptr, total_size);
-   if(clear) cudaMemset(*ptr, 0, total_size);
+    GPUERRORCHECK(cudaMalloc(ptr, total_size))
+    if (clear) GPUERRORCHECK(cudaMemset(*ptr, 0, total_size))
 }
 
-// Copy H->D(HtoD = true) and D->H(HtoD = false)
+// Copy to device and back
+// H->D(HtoD = true) and D->H(HtoD = false)
 void
 CopyGPUMemory(void* dest, void* src, unsigned int num_elems, bool HtoD)
 {
-   if (HtoD) cudaMemcpy(dest, src, num_elems, cudaMemcpyHostToDevice);
-   else  gpuErrchk(cudaMemcpy(dest, src, num_elems, cudaMemcpyDeviceToHost));
+    if (HtoD) GPUERRORCHECK(cudaMemcpy(dest, src, num_elems, cudaMemcpyHostToDevice))
+   else  GPUERRORCHECK(cudaMemcpy(dest, src, num_elems, cudaMemcpyDeviceToHost))
 }
 
-
+// Copy to constant memory
 void
 CopyToGPUConstantMemory(void* dest, void* src, int numBytes)
 {
-    cudaMemcpyToSymbol(dest, src, numBytes, 0, cudaMemcpyHostToDevice);
+    GPUERRORCHECK(cudaMemcpyToSymbol(dest, src, numBytes, 0, cudaMemcpyHostToDevice))
 }
 
 
@@ -71,7 +65,7 @@ CopyToGPUConstantMemory(void* dest, void* src, int numBytes)
 void
 FreeGPUMemory(void* ptr)
 {
-   cudaFree(ptr);
+    GPUERRORCHECK(cudaFree(ptr))
 }
 
 // Verify results
@@ -79,6 +73,6 @@ bool
 VerifyComputedData(float* reference, float* data, int numElems)
 {
    bool result = compareData(reference, data, numElems, 0.0001f, 0.0f);
-   printf("VerifyComputedData: %s\n", (result) ? "PASSED" : "FAILED");
+   printf("VerifyComputedData: %s\n", (result) ? "DATA OK" : "DATA MISMATCH");
    return result;
 }

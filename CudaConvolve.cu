@@ -6,6 +6,10 @@
 // This file contains implementations of CUDA kernels and wrappers
 //
 //
+//
+//
+// Created: 3-Dec-2014
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #include "CudaConvolve.h"
 
@@ -66,12 +70,11 @@ __global__ void ConvolveOneX(float* DevInBuffer, float* DevOutBuffer, int numEle
 
        // Wait for all thread to compute before loading the next channel
        __syncthreads();
-
     }
 }
 
 void
-CudaConvolve2DRow(CFloatImage buffer, CFloatImage kernel, float *dest, int numElems)
+CudaConvolve2DRow(CFloatImage& buffer, CFloatImage& kernel, float dest[], int numElems)
 {
    // Extract kernel details
    CShape kerShape = kernel.Shape();
@@ -94,17 +97,24 @@ CudaConvolve2DRow(CFloatImage buffer, CFloatImage kernel, float *dest, int numEl
 
    // Each pixel has numChans channels
    AllocateGPUMemory((void**)&DevInBuffer, sizeof(float) * numTotElems * numChans * kernelHeight, false);
-   AllocateGPUMemory((void**)&DevOutBuffer, sizeof(float) * (numTotElems * numChans * kernelHeight + KERNEL_14641_X), false);
+   AllocateGPUMemory((void**)&DevOutBuffer, sizeof(float) * (numTotElems * numChans * kernelHeight), false);
    CopyGPUMemory(DevInBuffer, StartAddr, sizeof(float) * numTotElems * numChans * kernelHeight, true);
 
-
-   cudaMemcpyToSymbol(ConvKern14641, KernStartAddr, sizeof(float) * kernelWidth, 0, cudaMemcpyHostToDevice);
-   //CopyToGPUConstantMem(ConvKern14641, KernStartAddr, sizeof(float) * kernelWidth);
+   // Copy the kernel to constant memory
+   GPUERRORCHECK(cudaMemcpyToSymbol(ConvKern14641, KernStartAddr, sizeof(float) * kernelWidth, 0, cudaMemcpyHostToDevice))
 
    ConvolveOneX << <Grid, Block >> >(DevInBuffer, DevOutBuffer, numElems, kerShape, srcShape);
 
+   // Wait to finish all the blocks
    cudaDeviceSynchronize();
-   CopyGPUMemory((void*)dest, (void*)DevOutBuffer, sizeof(float) * (numTotElems * numChans * kernelHeight + KERNEL_14641_X), false);
+   int CpyOffset = ((int)KERNEL_14641_X / 2);
+
+   // Copy out non-halo computation only
+   CopyGPUMemory(dest, DevOutBuffer + CpyOffset*numChans, sizeof(float) * (numElems * numChans * kernelHeight), false);
+
+   // Free GPU memory
+   FreeGPUMemory(DevInBuffer);
+   FreeGPUMemory(DevOutBuffer);
 }
 
 void

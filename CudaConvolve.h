@@ -30,7 +30,7 @@
 
 
 void
-CudaConvolve2DRow(CFloatImage buffer, CFloatImage kernel, float dst[], int n);
+CudaConvolve2DRow(CFloatImage& buffer, CFloatImage& kernel, float dst[], int n);
 
 void
 CopyToGPUConstantMem(void *dest, void *src, int num_elems);
