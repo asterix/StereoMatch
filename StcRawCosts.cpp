@@ -67,8 +67,20 @@ static int gcd(int a, int b)
     return gcd(b, a % b);
 }
 
-#ifdef OPT1
 void CStereoMatcher::RawCosts()
+{
+
+    float* cpu_cost = RawCostsCPU();
+    float* gpu_cost = RawCostsGPU();
+
+    VerifyComputedData(cpu_cost, gpu_cost, m_cost.ImageSize() / sizeof(float));
+
+    free(gpu_cost);
+    free(cpu_cost);
+
+}
+
+float* CStereoMatcher::RawCostsGPU()
 {
     StartTiming();
 
@@ -91,8 +103,6 @@ void CStereoMatcher::RawCosts()
     }
     if (verbose >= eVerboseProgress)
         fprintf(stderr, "\n");
-    
-
 
     // cuda function call
     LineProcess(m_reference, m_matching, m_cost,
@@ -101,12 +111,18 @@ void CStereoMatcher::RawCosts()
 
     PrintTiming();
 
+    float* cost_copy = (float*)malloc(m_cost.ImageSize());
+    cost_copy = (float*)memcpy(cost_copy, &m_cost.Pixel(0, 0, 0), m_cost.ImageSize());
+
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)
         WriteCosts(m_cost, "reprojected/RAW_DSI_%03d.pgm");
+
+    return cost_copy;
+
 }
-#else
-void CStereoMatcher::RawCosts()
+
+float* CStereoMatcher::RawCostsCPU()
 {
     StartTiming();
 
@@ -180,11 +196,10 @@ void CStereoMatcher::RawCosts()
             InterpolateLine(buf0, m_disp_den, w, b, match_interp);
         }
 
-        // Parallelized
         if (match_interval) {
-            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b, buffer_length);
+            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b);
             if (match_interpolated)
-                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b, buffer_length);
+                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b);
         }
 
         // Compute the costs, one disparity at a time
@@ -192,7 +207,7 @@ void CStereoMatcher::RawCosts()
         {
             float* cost = &m_cost.Pixel(0, y, k);
             int disp = -m_frame_diff_sign * (m_disp_den * disp_min + k * m_disp_num);
-            // Parallelized
+
             MatchLine(w, b, match_interpolated,
                 (match_interval) ? (match_interpolated) ? min0 : buf0 : buf0,
                 (match_interval) ? (match_interpolated) ? max0 : buf0 : 0,
@@ -206,11 +221,15 @@ void CStereoMatcher::RawCosts()
     }
     PrintTiming();
 
+    float* cost_copy = (float*)malloc(m_cost.ImageSize());
+    cost_copy = (float*)memcpy(cost_copy, &m_cost.Pixel(0, 0, 0), m_cost.ImageSize());
+
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)
         WriteCosts(m_cost, "reprojected/RAW_DSI_%03d.pgm");
+
+    return cost_copy;
 }
-#endif
 
 static void PadLine(int w, int b, float cost[],
                     int m_disp_n, int disp, int disp_den,

@@ -163,5 +163,8 @@ protected:
     clock_t m_start_time;               // start of elapsed time interval
     float m_elapsed_time;               // elapsed time in seconds
 
+    float* RawCostsCPU();
+    float* RawCostsGPU();
+
     std::vector<CStereoFrame> m_frame;  // input/output images
 };
