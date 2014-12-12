@@ -18,7 +18,8 @@
 
 // Serial Execution Versions
 
-__device__ __host__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp)     // interpolation function
+__host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB,
+    EStereoInterpFn match_interp)     // interpolation function
 {
     // Interpolate the missing values
     float si = 1.0f / s;
@@ -57,7 +58,8 @@ __device__ __host__ void InterpolateLine(int buf[], int s, int w, int nB, EStere
     }
 }
 
-__device__ __host__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b)
+__host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf,
+    const int w, const int b)
 {
     // Compute for every (interpolated) pixel, the minimum and maximum
     //  values in the two half-intervals before and after it
@@ -79,7 +81,7 @@ __device__ __host__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf,
     }
 }
 
-__device__ __host__ void MatchLine(int w, int b, int interpolated,
+__host__ __device__ void MatchLine(int w, int b, int interpolated,
     int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
     int mmn[], int mmx[],     // min/max of mtc (mtc if mmx == 0)
     float cost[],

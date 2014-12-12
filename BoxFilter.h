@@ -32,7 +32,11 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef BOXFILTER_H
+#define BOXFILTER_H
 
 template <class T>
 void BoxFilter(CImageOf<T>& src, CImageOf<T>& dst,
                int xWidth, int yWidth, bool average);
+
+#endif

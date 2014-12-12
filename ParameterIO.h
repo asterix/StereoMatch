@@ -24,11 +24,10 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef PARAMETER_IO_H
+#define PARAMETER_IO_H
 
 #include <vector>
-
-#ifndef PARAMETERIO_H
-#define PARAMETERIO_H
 
 struct CParameterPair {
     char* name;         // name string

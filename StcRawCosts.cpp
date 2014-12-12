@@ -55,6 +55,7 @@
 #include <time.h>
 
 #include "StcRawCost.h"
+#include "CudaUtilities.h"
 
 #define OPT1
 
@@ -89,7 +90,7 @@ float* CStereoMatcher::RawCostsGPU()
     int w = sh.width, h = sh.height, b = sh.nBands;
 
     if (verbose >= eVerboseProgress)
-        fprintf(stderr, "- computing costs: ");
+        fprintf(stderr, "- computing costs (gpu): ");
     if (verbose >= eVerboseSummary) {
         fprintf(stderr, match_fn == eAD ? "AD" : (match_fn == eSD ? "SD" : "???"));
         if (m_disp_step != 1.0f)
@@ -131,7 +132,7 @@ float* CStereoMatcher::RawCostsCPU()
     int w = sh.width, h = sh.height, b = sh.nBands;
 
     if (verbose >= eVerboseProgress)
-        fprintf(stderr, "- computing costs: ");
+        fprintf(stderr, "- computing costs (cpu): ");
     if (verbose >= eVerboseSummary) {
         fprintf(stderr, match_fn == eAD ? "AD" : (match_fn == eSD ? "SD" : "???"));
         if (m_disp_step != 1.0f)
@@ -207,21 +208,19 @@ float* CStereoMatcher::RawCostsCPU()
         {
             float* cost = &m_cost.Pixel(0, y, k);
             int disp = -m_frame_diff_sign * (m_disp_den * disp_min + k * m_disp_num);
-
             MatchLine(w, b, match_interpolated,
                 (match_interval) ? (match_interpolated) ? min0 : buf0 : buf0,
                 (match_interval) ? (match_interpolated) ? max0 : buf0 : 0,
                 (match_interval) ? min1 : buf1,
                 (match_interval) ? max1 : 0,
-                cost,
-                m_disp_n, disp, m_disp_den,
-                match_fn,
-                match_max, m_match_outside);
+                cost, m_disp_n, disp, m_disp_den,
+                match_fn, match_max, m_match_outside);
         }
     }
     PrintTiming();
 
-    float* cost_copy = (float*)malloc(m_cost.ImageSize());
+    int size = m_cost.ImageSize();
+    float* cost_copy = (float*)malloc(size);
     cost_copy = (float*)memcpy(cost_copy, &m_cost.Pixel(0, 0, 0), m_cost.ImageSize());
 
     // Write out the different disparity images

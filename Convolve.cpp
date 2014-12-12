@@ -29,6 +29,10 @@
 #include "Error.h"
 #include "Convert.h"
 #include "Convolve.h"
+#include "CudaConvolve.h"
+#include "CudaUtilities.h"
+
+extern Timer* profilingTimer;
 
 static int TrimIndex(int k, EBorderMode e, int n)
 {
@@ -123,6 +127,7 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     if (sShape.width * sShape.height * sShape.nBands == 0)
         return;
     CFloatImage output(CShape(sShape.width, 1, sShape.nBands));
+    //CFloatImage output1(CShape(sShape.width, 1, sShape.nBands));
 
     // Fill up the row buffer initially
     for (int k = 0; k < kShape.height; k++)
@@ -136,12 +141,25 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     if (minVal <= buffer.MinVal() && maxVal >= buffer.MaxVal())
         minVal = maxVal = 0;
 
+    // profilingTimer = new Timer;
+    FreeGPUMemory(0);
+
     // Process each row
     for (int y = 0; y < sShape.height; y++)
     {
         // Do the convolution
-        ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0),
-                      sShape.width);
+
+        // profilingTimer->startTimer();
+        if (kShape.height == 1) CudaConvolve2DRow(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
+        else 
+        ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
+        //printf("\nCPU execution time = %f ms", profilingTimer->stopAndGetTimerValue());
+        // Convolve on GPU
+        //profilingTimer->startTimer();
+        //printf("\nCurrent: %d ", y);
+        // printf("\nCUDA execution time = %f ms", profilingTimer->stopAndGetTimerValue());
+
+        //VerifyComputedData(&output.Pixel(0, 0, 0), &output1.Pixel(0, 0, 0), 6144);
 
         // Scale, offset, and type convert
         ScaleAndOffsetLine(&output.Pixel(0, 0, 0), &dst.Pixel(0, y, 0),
@@ -158,6 +176,7 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
             FillRowBuffer(&buffer.Pixel(0, k, 0), src, kernel, y+k+1, bWidth);
         }
     }
+    //printf("\nDone! ");
 }
 
 template <class T>

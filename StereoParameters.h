@@ -19,14 +19,13 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef STEREOPARAMETERS_H
+#define STEREOPARAMETERS_H
 
 #include <stdio.h>
 #include <vector>
 #include "ParameterIO.h"
 #include "Verbose.h"
-
-#ifndef STEREOPARAMETERS_H
-#define STEREOPARAMETERS_H
 
 //  Note:  we could also fold all of the parameters into a single struct,
 //      if that turns out to be easier for people to follow...
