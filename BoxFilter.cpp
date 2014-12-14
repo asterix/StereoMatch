@@ -21,6 +21,10 @@
 #include "BoxFilter.h"
 #include <assert.h>
 #include <vector>
+#include "CudaBoxFilter.h"
+#include "CudaUtilities.h"
+
+extern Timer* profilingTimer;
 
 static int borderIndex(int index, int len, EBorderMode m) {
     // TODO:  this code is common with Convolve.cpp:  should be merged...
@@ -183,31 +187,51 @@ extern void BoxFilter(CImageOf<T>& src, CImageOf<T>& dst,
     tmp.ReAllocate(sh);     // allocate memory for copy of src
     tmp.borderMode = src.borderMode;
 
-    int w = xWidth;  // window size      (e.g.,  5)
-    int pr = w / 2;     // pointer to right (e.g.,  2): value to add
-    int pl = pr - w;    // pointer to left  (e.g., -3): value to subtract
-    
-    // aggregate each row, all disparity levels in parallel
-
-    for (int y = 0; y < height; y++)
+    if (average && (xWidth != 3) && (xWidth == BOX_WINDOW_SIZE))
     {
-        T* src_row = &src.Pixel(0, y, 0);
-        T* dst_row = &tmp.Pixel(0, y, 0);
-        
-        boxFilterLines(src_row, dst_row, n_bands, width, n_bands, w, pl, pr, src.borderMode, average);
-    }
-    
-    // aggregate all columns at all disparity levels in parallel
-    
-    // compute vertical stride
-    int stride  = &dst.Pixel(0, 1, 0) - &src.Pixel(0, 0, 0);
-    int stride2 = &tmp.Pixel(0, 1, 0) - &tmp.Pixel(0, 0, 0);
-    assert(stride == stride2);
+       // The above check is a temporary hack to easily switch between CPU and GPU code
+       if (xWidth != BOX_WINDOW_SIZE) { throw CError("CudaBoxFilter: BOX_WINDOW_SIZE configuration different from used window size"); assert(false); }
 
-    T* src_cols = &tmp.Pixel(0, 0, 0);
-    T* dst_cols = &dst.Pixel(0, 0, 0);
-        
-    boxFilterLines(src_cols, dst_cols, n_bands*width, height, stride, w, pl, pr, dst.borderMode, average);
+       profilingTimer->startTimer();
+       CudaBoxFilterXY(src, dst, xWidth);
+
+       printf("\nGPU Box filtering: Window Size: %d , Time = %f ms\n", xWidth, profilingTimer->stopAndGetTimerValue());
+    }
+    else
+    {
+       // Note: This part is still maintained for non-average / 3x3 Evaluation() which does not fall under core stereo vision implementation
+
+       profilingTimer->startTimer();
+       
+       int w = xWidth;  // window size      (e.g.,  5)
+       int pr = w / 2;     // pointer to right (e.g.,  2): value to add
+       int pl = pr - w;    // pointer to left  (e.g., -3): value to subtract
+       
+       // aggregate each row, all disparity levels in parallel
+       
+       for (int y = 0; y < height; y++)
+       {
+           T* src_row = &src.Pixel(0, y, 0);
+           T* dst_row = &tmp.Pixel(0, y, 0);
+           
+           boxFilterLines(src_row, dst_row, n_bands, width, n_bands, w, pl, pr, src.borderMode, average);
+       }
+       
+       // aggregate all columns at all disparity levels in parallel
+       
+       // compute vertical stride
+       int stride  = &dst.Pixel(0, 1, 0) - &src.Pixel(0, 0, 0);
+       int stride2 = &tmp.Pixel(0, 1, 0) - &tmp.Pixel(0, 0, 0);
+       assert(stride == stride2);
+       
+       T* src_cols = &tmp.Pixel(0, 0, 0);
+       T* dst_cols = &dst.Pixel(0, 0, 0);
+       
+       boxFilterLines(src_cols, dst_cols, n_bands*width, height, stride, w, pl, pr, dst.borderMode, average);
+       
+       printf("\nCPU Box filtering: Window Size: %d , Time = %f ms\n", xWidth, profilingTimer->stopAndGetTimerValue());
+    }
+
 }
 
 extern void BoxFilter(CByteImage& src, CByteImage& dst,

@@ -89,9 +89,6 @@
     <ClCompile Include="Warp1D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vectoradd_gold.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BoxFilter.h">
@@ -145,13 +142,13 @@
     <ClInclude Include="Warp1D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vectoradd.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="CudaConvolve.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CudaUtilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaBoxFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -159,13 +156,13 @@
     <CustomBuild Include="README-StereoMatch.txt" />
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="vectoradd.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
     <CudaCompile Include="CudaUtilities.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="CudaConvolve.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CudaBoxFilter.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

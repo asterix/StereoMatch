@@ -1,0 +1,19 @@
+# exp_all.txt
+#
+# top-level script-file for experiments in IJCV taxonomy paper
+
+# This script file lives in the subdirectory imagedirs/Scripts
+# and sequences through the datasets
+
+# edit this file to select which data sets to use
+
+# edit the script 'exp_dispatch.txt' to select which experiments to run
+
+verbose 5       # just the summary
+
+  # University of Tsukuba "Lamp" sequence with manually established ground truth
+  # used by permission
+  # color, 5 images (1..5), use 3 and 4 
+cd ../tsukuba
+script ../Scripts/exp_dispatch.txt
+

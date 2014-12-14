@@ -127,7 +127,6 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     if (sShape.width * sShape.height * sShape.nBands == 0)
         return;
     CFloatImage output(CShape(sShape.width, 1, sShape.nBands));
-    //CFloatImage output1(CShape(sShape.width, 1, sShape.nBands));
 
     // Fill up the row buffer initially
     for (int k = 0; k < kShape.height; k++)
@@ -141,25 +140,11 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     if (minVal <= buffer.MinVal() && maxVal >= buffer.MaxVal())
         minVal = maxVal = 0;
 
-    // profilingTimer = new Timer;
-    FreeGPUMemory(0);
-
     // Process each row
     for (int y = 0; y < sShape.height; y++)
     {
         // Do the convolution
-
-        // profilingTimer->startTimer();
-        if (kShape.height == 1) CudaConvolve2DRow(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
-        else 
-        ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
-        //printf("\nCPU execution time = %f ms", profilingTimer->stopAndGetTimerValue());
-        // Convolve on GPU
-        //profilingTimer->startTimer();
-        //printf("\nCurrent: %d ", y);
-        // printf("\nCUDA execution time = %f ms", profilingTimer->stopAndGetTimerValue());
-
-        //VerifyComputedData(&output.Pixel(0, 0, 0), &output1.Pixel(0, 0, 0), 6144);
+       ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
 
         // Scale, offset, and type convert
         ScaleAndOffsetLine(&output.Pixel(0, 0, 0), &dst.Pixel(0, y, 0),
@@ -176,7 +161,6 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
             FillRowBuffer(&buffer.Pixel(0, k, 0), src, kernel, y+k+1, bWidth);
         }
     }
-    //printf("\nDone! ");
 }
 
 template <class T>
@@ -196,6 +180,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
 
     // Allocate the intermediate images
     CImageOf<T> tmpImg1(src.Shape());
+    //CImageOf<T> tmpImgCUDA(src.Shape());
     CImageOf<T> tmpImg2(src.Shape());
 
     // Create a proper vertical convolution kernel
@@ -204,24 +189,62 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
         v_kernel.Pixel(0, k, 0) = y_kernel.Pixel(k, 0, 0);
     v_kernel.origin[1] = y_kernel.origin[0];
 
+    BinomialFilterType type;
+
+    profilingTimer->startTimer();
+
+    // CUDA Convolve
+    switch (x_kernel.Shape().width)
+    {
+       case 3:
+           type = BINOMIAL6126;
+           break;
+       case 5:
+           type = BINOMIAL14641;
+           break;
+       default:
+           // Unsupported kernel case
+           throw CError("Convolution kernel Unknown");
+           assert(false);
+    }
+
+
+    if (decimate != 1) CudaConvolveXY(src, tmpImg2, type); 
+    else CudaConvolveXY(src, dst, type);
+
+    printf("\nGPU convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+
+#if 0
+    profilingTimer->startTimer();
+    //VerifyComputedData(&tmpImg2.Pixel(0, 0, 0), &tmpImgCUDA.Pixel(0, 0, 0), 7003904);
+
     // Perform the two convolutions
     Convolve(src, tmpImg1, x_kernel, 1.0f, 0.0f);
     Convolve(tmpImg1, tmpImg2, v_kernel, scale, offset);
 
+    printf("\nCPU Convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());*/
+#endif
+
+    profilingTimer->startTimer();
     // Downsample or copy
-    for (int y = 0; y < dShape.height; y++)
+    // Skip decimate and recopy is not required
+    if (decimate != 1)
     {
-        T* sPtr = &tmpImg2.Pixel(0, y * decimate, 0);
-        T* dPtr = &dst.Pixel(0, y, 0);
-        int nB  = dShape.nBands;
-        for (int x = 0; x < dShape.width; x++)
-        {
-            for (int b = 0; b < nB; b++)
-                dPtr[b] = sPtr[b];
-            sPtr += decimate * nB;
-            dPtr += nB;
-        }
+       for (int y = 0; y < dShape.height; y++)
+       {
+           T* sPtr = &tmpImg2.Pixel(0, y * decimate, 0);
+           T* dPtr = &dst.Pixel(0, y, 0);
+           int nB  = dShape.nBands;
+           for (int x = 0; x < dShape.width; x++)
+           {
+               for (int b = 0; b < nB; b++)
+                   dPtr[b] = sPtr[b];
+               sPtr += decimate * nB;
+               dPtr += nB;
+           }
+       }
     }
+    printf("\nDecimate/Recopy takes = %f ms\n", profilingTimer->stopAndGetTimerValue());
 }
 
 template <class T>

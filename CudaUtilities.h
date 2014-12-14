@@ -23,6 +23,7 @@
 #include <helper_functions.h>
 #include <helper_timer.h>
 #include <driver_types.h>
+#include <cuda_runtime_api.h>
 
 
 #define GPUERRORCHECK(call) { ReportGPUError((call), __FILE__, __LINE__);}
