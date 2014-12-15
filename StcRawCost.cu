@@ -178,7 +178,7 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
 // Kernel functions
 
 __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
-    float* cost1, int cost1_width, BufferStruct buffs, LineProcessStruct args)
+    BufferStruct buffs, LineProcessStruct args)
 {
     unsigned y = (threadIdx.y + blockIdx.y * blockDim.y);
 
@@ -189,13 +189,12 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
         uchar* ref = PixelAddress(m_reference, 0, y, 0);
         uchar* mtc = PixelAddress(m_matching, 0, y, 0);
 
-        unsigned buf_start = y * args.n_interp * args.b;
-        int*  buf0 = &(buffs.buffer0[buf_start]);
-        int*  buf1 = &(buffs.buffer1[buf_start]);
-        int*  min0 = &(buffs.min_bf0[buf_start]);
-        int*  max0 = &(buffs.max_bf0[buf_start]);
-        int*  min1 = &(buffs.min_bf1[buf_start]);
-        int*  max1 = &(buffs.max_bf1[buf_start]);
+        int*  buf0 = &(buffs.buffer0.array[y * buffs.buffer0.width]);
+        int*  buf1 = &(buffs.buffer1.array[y * buffs.buffer1.width]);
+        int*  min0 = &(buffs.min_bf0.array[y * buffs.min_bf0.width]);
+        int*  max0 = &(buffs.max_bf0.array[y * buffs.max_bf0.width]);
+        int*  min1 = &(buffs.min_bf1.array[y * buffs.min_bf0.width]);
+        int*  max1 = &(buffs.max_bf1.array[y * buffs.max_bf1.width]);
 
         // Fill the line buffers
         for (int x = 0, l = 0, m = 0; x < args.w; x++, m += args.m_disp_den*args.b)
@@ -241,7 +240,7 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
                 args.match_outside
             };
             
-            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), &cost1[y * cost1_width]);
+            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), &buffs.cost1.array[y * buffs.cost1.width]);
         }
     }
 }
@@ -253,32 +252,41 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
 
     // Allocate working buffers
     BufferStruct buffs;
-    int buf_length = args.n_interp * args.b; // size of one row
-    int buf_size = args.h * buf_length * sizeof(int);
+    int buf_width = args.n_interp * args.b; // size of one row (width)
+    int buf_size = args.h * buf_width * sizeof(int); // in bytes
     
-    AllocateGPUMemory((void**)&(buffs.buffer0), buf_size, false);
-    AllocateGPUMemory((void**)&(buffs.buffer1), buf_size, false);
-    AllocateGPUMemory((void**)&(buffs.min_bf0), buf_size, false);
-    AllocateGPUMemory((void**)&(buffs.max_bf0), buf_size, false);
-    AllocateGPUMemory((void**)&(buffs.min_bf1), buf_size, false);
-    AllocateGPUMemory((void**)&(buffs.max_bf1), buf_size, false);
+    AllocateGPUMemory((void**)&(buffs.buffer0.array), buf_size, false);
+    Populate2DArray(&buffs.buffer0, buf_width, args.h);
+    AllocateGPUMemory((void**)&(buffs.buffer1.array), buf_size, false);
+    Populate2DArray(&buffs.buffer1, buf_width, args.h);
+    AllocateGPUMemory((void**)&(buffs.min_bf0.array), buf_size, false);
+    Populate2DArray(&buffs.min_bf0, buf_width, args.h);
+    AllocateGPUMemory((void**)&(buffs.max_bf0.array), buf_size, false);
+    Populate2DArray(&buffs.max_bf0, buf_width, args.h);
+    AllocateGPUMemory((void**)&(buffs.min_bf1.array), buf_size, false);
+    Populate2DArray(&buffs.min_bf1, buf_width, args.h);
+    AllocateGPUMemory((void**)&(buffs.max_bf1.array), buf_size, false);
+    Populate2DArray(&buffs.max_bf1, buf_width, args.h);
+
+    int cost1_width = ((args.w - 1)*args.m_disp_den + 1);
+    int cost1_size = args.h * cost1_width * sizeof(float);
+
+    AllocateGPUMemory((void**)&(buffs.cost1.array), cost1_size, false);
+    Populate2DArray(&buffs.cost1, cost1_width, args.h);
 
     // Allocate input and output image data
     uchar* m_ref_d;
     uchar* m_match_d;
     float* m_cost_d;
-    float* cost1_d;
 
     int m_ref_size = m_reference.ImageSize();
     int m_match_size = m_matching.ImageSize();
     int m_cost_size = m_cost.ImageSize();
-    int cost1_width = ((args.w - 1)*args.m_disp_den + 1);
-    int cost1_size = args.h * cost1_width * sizeof(float);
 
     AllocateGPUMemory((void**)&m_ref_d, m_ref_size, false);
     AllocateGPUMemory((void**)&m_match_d, m_match_size, false);
     AllocateGPUMemory((void**)&m_cost_d, m_cost_size, false);
-    AllocateGPUMemory((void**)&cost1_d, cost1_size, false);
+    
 
     // Copy image data to device
     CopyGPUMemory(m_ref_d, m_reference.PixelAddress(0, 0, 0), m_ref_size, true);
@@ -304,7 +312,7 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     gridSize.y = (unsigned int)ceil((float)(args.h) / (float)blockSize.y);
 
     // Kernel call
-    LineProcessKernel <<<gridSize, blockSize >>>(m_ref_struct, m_match_struct, m_cost_struct, cost1_d, cost1_width, buffs, args);
+    LineProcessKernel <<<gridSize, blockSize>>>(m_ref_struct, m_match_struct, m_cost_struct, buffs, args);
 
     GPUERRORCHECK(cudaDeviceSynchronize());
 
@@ -316,17 +324,17 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     CopyGPUMemory(m_cost.PixelAddress(0, 0, 0), m_cost_d, m_cost_size, false);
 
     // Free the memory
-    FreeGPUMemory(buffs.buffer0);
-    FreeGPUMemory(buffs.buffer1);
-    FreeGPUMemory(buffs.min_bf0);
-    FreeGPUMemory(buffs.max_bf0);
-    FreeGPUMemory(buffs.min_bf1);
-    FreeGPUMemory(buffs.max_bf1);
+    FreeGPUMemory(buffs.buffer0.array);
+    FreeGPUMemory(buffs.buffer1.array);
+    FreeGPUMemory(buffs.min_bf0.array);
+    FreeGPUMemory(buffs.max_bf0.array);
+    FreeGPUMemory(buffs.min_bf1.array);
+    FreeGPUMemory(buffs.max_bf1.array);
+    FreeGPUMemory(buffs.cost1.array);
 
     FreeGPUMemory(m_ref_d);
     FreeGPUMemory(m_match_d);
     FreeGPUMemory(m_cost_d);
-    FreeGPUMemory(cost1_d);
 
     printf("\nGPU Raw Costs results transfer & clean-up: Time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 }
@@ -354,13 +362,32 @@ __device__ float* PixelAddress(ImageStructFloat image, int x, int y, int band)
 // Populates the ImageSizeStruct from the provided CImage
 ImageSizeStruct PopulateImageSizeStruct(CImage image)
 {
-    ImageSizeStruct size;
-    size.bands = image.Shape().nBands;
-    size.height = image.Shape().height;
-    size.width = image.Shape().width;
-    size.bandSize = image.BandSize();
-    size.pixSize = image.PixSize();
-    size.rowSize = image.RowSize();
-
+    ImageSizeStruct size = {
+        image.BandSize(),
+        image.RowSize(),
+        image.PixSize(),
+        image.Shape().width,
+        image.Shape().height,
+        image.Shape().nBands
+    };
     return size;
+}
+
+// Populates the TwoDIntArray structure
+void Populate2DArray(TwoDIntArray* value, int width, int height)
+{
+    value->width = width;
+    value->height = height;
+    value->num_elems = width * height;
+    value->size_bytes = width * height * sizeof(int);
+
+}
+
+// Populates the TwoDFloatArray structure
+void Populate2DArray(TwoDFloatArray* value, int width, int height)
+{
+    value->width = width;
+    value->height = height;
+    value->num_elems = width * height;
+    value->size_bytes = width * height * sizeof(float);
 }

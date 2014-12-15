@@ -32,6 +32,24 @@ struct ImageStructFloat
     float* image;
 };
 
+struct TwoDIntArray
+{
+    int* array;
+    int width;
+    int height;
+    int num_elems;
+    int size_bytes; // in bytes
+};
+
+struct TwoDFloatArray
+{
+    float* array;
+    int width;
+    int height;
+    int num_elems;
+    int size_bytes; // in bytes
+};
+
 struct MatchLineStruct
 {
     int w;
@@ -70,12 +88,14 @@ struct LineProcessStruct
 
 struct BufferStruct
 {
-    int* buffer0;
-    int* buffer1;
-    int* min_bf0;
-    int* max_bf0;
-    int* min_bf1;
-    int* max_bf1;
+    TwoDIntArray buffer0;
+    TwoDIntArray buffer1;
+    TwoDIntArray min_bf0;
+    TwoDIntArray max_bf0;
+    TwoDIntArray min_bf1;
+    TwoDIntArray max_bf1;
+
+    TwoDFloatArray cost1;
 };
 
 // Raw Cost standard functions
@@ -90,11 +110,13 @@ __device__ int PixelCoordToAbs(ImageSizeStruct size, int x, int y, int band);
 __device__ uchar* PixelAddress(ImageStructUChar image, int x, int y, int band);
 __device__ float* PixelAddress(ImageStructFloat image, int x, int y, int band);
 ImageSizeStruct PopulateImageSizeStruct(CImage image);
+void Populate2DArray(TwoDIntArray* value, int width, int height);
+void Populate2DArray(TwoDFloatArray* value, int width, int height);
 
 // Raw Cost kernel functions
 void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost, LineProcessStruct args);
 __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
-    float* cost1, int cost1_width, BufferStruct buffs, LineProcessStruct args);
+    BufferStruct buffs, LineProcessStruct args);
 
 
 
