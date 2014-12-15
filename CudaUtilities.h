@@ -25,8 +25,12 @@
 #include <helper_functions.h>
 #include <helper_timer.h>
 #include <driver_types.h>
+#include <cuda_runtime_api.h>
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// GPU Error detection
+///////////////////////////////////////////////////////////////////////////////////////////////////
 #define GPUERRORCHECK(call) { ReportGPUError((call), __FILE__, __LINE__);}
 inline void ReportGPUError(cudaError_t ret_code, const char *file, int line)
 {
@@ -38,7 +42,10 @@ inline void ReportGPUError(cudaError_t ret_code, const char *file, int line)
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // Timer utility
+///////////////////////////////////////////////////////////////////////////////////////////////////
 class Timer
 {
 private:
@@ -62,7 +69,11 @@ public:
     float stopAndGetTimerValue();
 };
 
-// CUDA Memory handling functions
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Prototypes
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void
 CopyGPUMemory(void* dest, void* src, unsigned int num_elems, bool HtoD);
 
@@ -75,7 +86,6 @@ FreeGPUMemory(void* ptr);
 void
 CopyToGPUConstantMemory(void* dest, void* src, int numBytes);
 
-// Computed data verification
 bool
 VerifyComputedData(float* reference, float* data, int numElems);
 
