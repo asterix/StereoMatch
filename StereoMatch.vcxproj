@@ -48,14 +48,14 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IntDir>$(Platform)/$(Configuration)/</IntDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <IncludePath>$(IncludePath)</IncludePath>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules />
     <CodeAnalysisRuleAssemblies />
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='Win32'">
-    <OutDir>./$(IntDir)/imagedirs/Scripts</OutDir>
+    <OutDir>$(Platform)\$(Configuration)\imagedirs\Scripts\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <OutDir>../../bin/win64/$(Configuration)/</OutDir>
@@ -90,7 +90,11 @@
     </Link>
     <CudaCompile>
       <Runtime>MTd</Runtime>
+      <GenerateLineInfo Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</GenerateLineInfo>
     </CudaCompile>
+    <CudaLink>
+      <GPUDebugInfo Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</GPUDebugInfo>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>

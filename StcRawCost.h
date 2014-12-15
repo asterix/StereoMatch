@@ -1,15 +1,14 @@
 
-#include "StereoParameters.h"
-
 #ifndef STCRAWCOST_H
 #define STCRAWCOST_H
 
-#define BLOCKSIZE 1024
+#include "StereoParameters.h"
+#include "CudaUtilities.h"
+
+#define BLOCKSIZE 512
 #define BAD_COST -1
 
 #define UNDEFINED_COST true // set this to true to pad with outside_cost
-
-typedef int* iptr;
 
 struct ImageSizeStruct
 {
@@ -33,49 +32,71 @@ struct ImageStructFloat
     float* image;
 };
 
-void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
-void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
-void MatchLine(int w, int b, int interpolated,
-    int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
-    int mmn[], int mmx[],     // min/max of mtc (mtc if mmx == 0)
-    float cost[],
-    int m_disp_n, int disp, int disp_den,
-    EStereoMatchFn match_fn,  // matching function
-    int match_max,            // maximum difference for truncated SAD/SSD
-    float match_outside);
+struct MatchLineStruct
+{
+    int w;
+    int b;
+    int interpolated;
+    int* rmn; // min/max of ref (ref if rmx == 0)
+    int* rmx;
+    int* mmn; // min/max of mtc (mtc if mmx == 0)
+    int* mmx;
+    int m_disp_n;
+    int disp;
+    int m_disp_den;
+    EStereoMatchFn match_fn; // matching function
+    int match_max; // maximum difference for truncated SAD/SSD
+    float match_outside;
+    int rmx_not_null;
+    int mmx_not_null;
+};
 
-void BirchfieldTomasiMinMax(const int* buffer, int* min_buf_d, int* max_buf_d, const int w, const int b, int buffer_length);
+struct LineProcessStruct
+{
+    int m_disp_den;
+    int m_disp_n;
+    int b;
+    int w;
+    int h;
+    EStereoInterpFn match_interp;
+    int match_interval;
+    int match_interpolated;
+    int m_frame_diff_sign;
+    int disp_min;
+    int m_disp_num;
+    EStereoMatchFn match_fn;
+    int match_max;
+    float match_outside;
+};
 
-void MatchLine(int w, int b, int interpolated,
-    int rmn[], int rmx[],     // min/max of ref (ref if rmx == 0)
-    int mmn[], int mmx[],     // min/max of mtc (mtc if mmx == 0)
-    float cost[],
-    int m_disp_n, int disp, int disp_den,
-    EStereoMatchFn match_fn,  // matching function
-    int match_max,            // maximum difference for truncated SAD/SSD
-    float match_outside,        // special value for outside match
-    int match_interval,
-    int match_interpolated,
-    int buffer_length);
+struct BufferStruct
+{
+    int* buffer0;
+    int* buffer1;
+    int* min_bf0;
+    int* max_bf0;
+    int* min_bf1;
+    int* max_bf1;
+};
 
-void MatchPixels(int w, int b, int interpolated,
-    int* rmn, int* rmx,     // min/max of ref (ref if rmx == 0)
-    int* mmn, int* mmx,     // min/max of mtc (mtc if mmx == 0)
-    float* cost1,
-    int disp,
-    EStereoMatchFn match_fn,  // matching function
-    int n,
-    int s,
-    int cutoff,
-    int match_interval,
-    int match_interpolated,
-    int buffer_length,
-    int cost1_length);
+// Raw Cost standard functions
+__host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
+__host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
+__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in, int cost1_start);
+void MatchLineHost(MatchLineStruct args, float* cost);
 
-void BoxFilter(float* cost1, float* cost, int n, int w, int m_disp_n, int disp_den, int interpolated, int cost1_length, int cost_length);
+// Raw Cost helper functions
+__host__ __device__ float CubicInterpolateRC(float x0, float v0, float v1, float v2, float v3);
+__device__ int PixelCoordToAbs(ImageSizeStruct size, int x, int y, int band);
+__device__ uchar* PixelAddress(ImageStructUChar image, int x, int y, int band);
+__device__ float* PixelAddress(ImageStructFloat image, int x, int y, int band);
+ImageSizeStruct PopulateImageSizeStruct(CImage image);
 
-void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost,
-    int m_disp_den, int m_disp_n, int b, int w, int h, EStereoInterpFn match_interp, int* match_interval, int match_interpolated,
-    int m_frame_diff_sign, int disp_min, int m_disp_num, EStereoMatchFn match_fn, int match_max, float* m_match_outside);
+// Raw Cost kernel functions
+void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost, LineProcessStruct args);
+__global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
+    float* cost1, int cost1_width, int n_interp, BufferStruct buffs, LineProcessStruct args);
+
+
 
 #endif
