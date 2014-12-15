@@ -56,6 +56,8 @@
 
 #include "StcRawCost.h"
 
+extern Timer* profilingTimer;
+
 #define OPT1
 
 #define GPU (1)
@@ -95,7 +97,7 @@ void CStereoMatcher::RawCosts()
 
 float* CStereoMatcher::RawCostsGPU()
 {
-    StartTiming();
+    profilingTimer->startTimer();
 
     // Compute raw per-pixel matching score between a pair of frames
     CShape sh = m_reference.Shape();
@@ -149,7 +151,7 @@ float* CStereoMatcher::RawCostsGPU()
     // cuda function call
     LineProcess(m_reference, m_matching, m_cost, args);
 
-    PrintTiming();
+    printf("\GPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)
@@ -171,7 +173,7 @@ float* CStereoMatcher::RawCostsGPU()
 
 float* CStereoMatcher::RawCostsCPU()
 {
-    StartTiming();
+    profilingTimer->startTimer();
 
     // Compute raw per-pixel matching score between a pair of frames
     CShape sh = m_reference.Shape();
@@ -272,7 +274,7 @@ float* CStereoMatcher::RawCostsCPU()
             MatchLineHost(args, &m_cost.Pixel(0, y, k));
         }
     }
-    PrintTiming();
+    printf("\CPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)
