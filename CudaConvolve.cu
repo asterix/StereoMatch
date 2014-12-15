@@ -239,12 +239,14 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
         case BINOMIAL6126:
         {
            GPUERRORCHECK(cudaMemcpyToSymbol(ConvKern6126XY, Binomial6126XY, sizeof(float) * KERNEL_121_X * KERNEL_14641_Y, 0, cudaMemcpyHostToDevice))
+           GPUERRORCHECK(cudaFuncSetCacheConfig(ConvolveXY121<float>, cudaFuncCachePreferL1))
            ConvolveXY121 << <Grid, Block >> >(DevInBuffer, DevOutBuffer, srcShape);
            break;
         }
         case BINOMIAL14641:
         {
            GPUERRORCHECK(cudaMemcpyToSymbol(ConvKern14641XY, Binomial14641XY, sizeof(float) * KERNEL_14641_X * KERNEL_14641_Y, 0, cudaMemcpyHostToDevice))
+           GPUERRORCHECK(cudaFuncSetCacheConfig(ConvolveXY<float>, cudaFuncCachePreferL1))
            ConvolveXY << <Grid, Block >> >(DevInBuffer, DevOutBuffer, srcShape);
            break;
         }
@@ -282,3 +284,4 @@ template void CudaConvolveXY<unsigned char>(class CImageOf<unsigned char>, class
 template void CudaConvolveXY<int>(class CImageOf<int>, class CImageOf<int> &, BinomialFilterType);
 
 template __global__ void ConvolveXY<float>(float *, float *, struct CShape);
+template __global__ void ConvolveXY121<float>(float *, float *, struct CShape);

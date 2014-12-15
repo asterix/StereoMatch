@@ -13,6 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CudaUtilities.h"
+#include "Error.h"
 
 Timer *profilingTimer;
 Timer *profilingTimer2;
@@ -84,4 +85,24 @@ VerifyComputedData(float* reference, float* data, int numElems)
    bool result = compareData(reference, data, numElems, 0.0001f, 0.0f);
    printf("VerifyComputedData: %s\n", (result) ? "DATA OK" : "DATA MISMATCH");
    return result;
+}
+
+
+void
+prepareDevice(void)
+{
+   // Get device properties
+   int devices;
+   GPUERRORCHECK(cudaGetDeviceCount(&devices))
+
+   if (devices == 0)
+   {
+      throw CError("No CUDA GPUs found");
+   }
+
+   // Create a context for this process on the GPU - GPU-Attach
+   FreeGPUMemory(0); 
+
+   // Set L1 cache preference mode
+   // This is done just before kernel call
 }

@@ -87,4 +87,7 @@ CopyToGPUConstantMemory(void* dest, void* src, int numBytes);
 bool
 VerifyComputedData(float* reference, float* data, int numElems);
 
+void
+prepareDevice(void);
+
 #endif
