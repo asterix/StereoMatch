@@ -58,9 +58,9 @@
 
 #define OPT1
 
-#define GPU (0)
+#define GPU (1)
 #define CPU (0)
-#define BOTH (1)
+#define BOTH (0)
 
 static int gcd(int a, int b)
 {
@@ -123,6 +123,11 @@ float* CStereoMatcher::RawCostsGPU()
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
     m_match_outside = __min(worst_match, cutoff);	// trim to cutoff
 
+    // Allocate a buffer for interpolated values
+    //  Note that we don't have to interpolate the ref image if we
+    //  aren't using match_interpolated, but it's simpler to code this way.
+    int n_interp = m_disp_den * (w - 1) + 1;
+
     LineProcessStruct args = {
         m_disp_den,
         m_disp_n,
@@ -137,7 +142,8 @@ float* CStereoMatcher::RawCostsGPU()
         m_disp_num,
         match_fn,
         match_max,
-        m_match_outside
+        m_match_outside,
+        n_interp
     };
 
     // cuda function call

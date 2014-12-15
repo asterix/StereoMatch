@@ -47,8 +47,6 @@ struct MatchLineStruct
     EStereoMatchFn match_fn; // matching function
     int match_max; // maximum difference for truncated SAD/SSD
     float match_outside;
-    int rmx_not_null;
-    int mmx_not_null;
 };
 
 struct LineProcessStruct
@@ -67,6 +65,7 @@ struct LineProcessStruct
     EStereoMatchFn match_fn;
     int match_max;
     float match_outside;
+    int n_interp;
 };
 
 struct BufferStruct
@@ -82,7 +81,7 @@ struct BufferStruct
 // Raw Cost standard functions
 __host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
 __host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
-__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in, int cost1_start);
+__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in);
 void MatchLineHost(MatchLineStruct args, float* cost);
 
 // Raw Cost helper functions
@@ -95,7 +94,7 @@ ImageSizeStruct PopulateImageSizeStruct(CImage image);
 // Raw Cost kernel functions
 void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost, LineProcessStruct args);
 __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
-    float* cost1, int cost1_width, int n_interp, BufferStruct buffs, LineProcessStruct args);
+    float* cost1, int cost1_width, BufferStruct buffs, LineProcessStruct args);
 
 
 

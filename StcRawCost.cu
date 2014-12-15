@@ -9,12 +9,12 @@
 
 #include <cuda.h>
 
-#if defined(WIN32) ||  CUDAVER >= 5
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#endif
 
 #include "StcRawCost.h"
+
+#define PREALLOC_BUFF (0) // size of pre-allocated buffers to use in each thread (set to 0 to use dynamic allocation)
 
 // Serial / Parallel implementation
 
@@ -93,9 +93,7 @@ __host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf,
     }
 }
 
-// Parallel only implementation
-
-__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in, int cost1_start)
+__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in)
 {
     // Set up the starting addresses, pointers, and cutoff value
     int n = (args.w - 1)*args.m_disp_den + 1;             // number of reference pixels
@@ -103,7 +101,11 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
     int cutoff = (args.match_fn == eSD) ? args.match_max * args.match_max : abs(args.match_max);
     // TODO:  cutoff is not adjusted for the number of bands...
 
-    float* cost1 = &cost1_in[cost1_start];
+#if PREALLOC_BUFF
+    float cost1[PREALLOC_BUFF];
+#else
+    float* cost1 = cost1_in;
+#endif
 
     // Match valid pixels
     float  left_cost = BAD_COST;
@@ -126,7 +128,7 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
         for (int ib = 0; ib < args.b; ib++)
         {
             int diff1 = mn[ib] - rn[ib];    // straightforward difference
-            if (args.rmx_not_null && args.mmx_not_null)
+            if (args.rmx && args.mmx)
             {
                 // Compare intervals (see partial shuffle code in StcEvaluate.cpp)
                 int xn = __max(rn[ib], mn[ib]);     // max of mins
@@ -177,18 +179,95 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
     }
 }
 
+// Kernel functions
+
+__global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
+    float* cost1, int cost1_width, BufferStruct buffs, LineProcessStruct args)
+{
+    unsigned y = (threadIdx.y + blockIdx.y * blockDim.y);
+
+    // Process all of the lines
+    if (y < args.h)
+    {
+        
+        uchar* ref = PixelAddress(m_reference, 0, y, 0);
+        uchar* mtc = PixelAddress(m_matching, 0, y, 0);
+
+#if PREALLOC_BUFF
+        int  buf0[PREALLOC_BUFF];
+        int  buf1[PREALLOC_BUFF];
+        int  min0[PREALLOC_BUFF];
+        int  max0[PREALLOC_BUFF];
+        int  min1[PREALLOC_BUFF];
+        int  max1[PREALLOC_BUFF];
+#else
+        unsigned buf_start = y * args.n_interp * args.b;
+        int*  buf0 = &(buffs.buffer0[buf_start]);
+        int*  buf1 = &(buffs.buffer1[buf_start]);
+        int*  min0 = &(buffs.min_bf0[buf_start]);
+        int*  max0 = &(buffs.max_bf0[buf_start]);
+        int*  min1 = &(buffs.min_bf1[buf_start]);
+        int*  max1 = &(buffs.max_bf1[buf_start]);
+#endif
+
+        // Fill the line buffers
+        for (int x = 0, l = 0, m = 0; x < args.w; x++, m += args.m_disp_den*args.b)
+        {
+            for (int k = 0; k < args.b; k++, l++)
+            {
+                buf0[m + k] = (int)ref[l];
+                buf1[m + k] = (int)mtc[l];
+            }
+        }
+
+        // Interpolate the matching signal
+        if (args.m_disp_den > 1)
+        {
+            InterpolateLine(buf1, args.m_disp_den, args.w, args.b, args.match_interp);
+            InterpolateLine(buf0, args.m_disp_den, args.w, args.b, args.match_interp);
+        }
+
+        if (args.match_interval) {
+            BirchfieldTomasiMinMax(buf1, min1, max1, args.n_interp, args.b);
+            if (args.match_interpolated)
+                BirchfieldTomasiMinMax(buf0, min0, max0, args.n_interp, args.b);
+        }
+
+        // Compute the costs, one disparity at a time
+        for (int k = 0; k < args.m_disp_n; k++)
+        {
+            int disp = -args.m_frame_diff_sign * (args.m_disp_den * args.disp_min + k * args.m_disp_num);
+
+            MatchLineStruct lineArgs = {
+                args.w,
+                args.b,
+                args.match_interpolated, //match_interpolated
+                (args.match_interval) ? (args.match_interpolated) ? min0 : buf0 : buf0, // rmn
+                (args.match_interval) ? (args.match_interpolated) ? max0 : buf0 : 0, // rmx
+                (args.match_interval) ? min1 : buf1, // mmn
+                (args.match_interval) ? max1 : 0, // mmx
+                args.m_disp_n,
+                disp,
+                args.m_disp_den,
+                args.match_fn,
+                args.match_max,
+                args.match_outside
+            };
+            
+            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), &cost1[y * cost1_width]);
+        }
+    }
+}
+
 void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost, LineProcessStruct args)
 {
-    // Allocate a buffer for interpolated values
-    //  Note that we don't have to interpolate the ref image if we
-    //  aren't using match_interpolated, but it's simpler to code this way.
-    int n_interp = args.m_disp_den * (args.w - 1) + 1;
+    
 
     // Allocate working buffers
     BufferStruct buffs;
-    int buf_length = n_interp * args.b; // size of one row
+    int buf_length = args.n_interp * args.b; // size of one row
     int buf_size = args.h * buf_length * sizeof(int);
-    
+
     AllocateGPUMemory((void**)&(buffs.buffer0), buf_size, false);
     AllocateGPUMemory((void**)&(buffs.buffer1), buf_size, false);
     AllocateGPUMemory((void**)&(buffs.min_bf0), buf_size, false);
@@ -231,10 +310,9 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     // Block/Grid size
     dim3 gridSize, blockSize(1, BLOCKSIZE, 1);
     gridSize.y = (unsigned int)ceil((float)(args.h) / (float)blockSize.y);
-    
+
     // Kernel call
-    LineProcessKernel<<<gridSize, blockSize>>>(m_ref_struct, m_match_struct, m_cost_struct, cost1_d, cost1_width, n_interp, buffs, args);
-    //LineProcessKernelDumb <<<gridSize, blockSize >>>(m_ref_struct, m_match_struct, m_cost_struct, cost1_d, cost1_width, n_interp, buffs, args);
+    LineProcessKernel <<<gridSize, blockSize >>>(m_ref_struct, m_match_struct, m_cost_struct, cost1_d, cost1_width, buffs, args);
 
     GPUERRORCHECK(cudaDeviceSynchronize());
 
@@ -257,78 +335,10 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
 
 // Helper functions
 
-__global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
-    float* cost1, int cost1_width, int n_interp, BufferStruct buffs, LineProcessStruct args)
-{
-    unsigned y = (threadIdx.y + blockIdx.y * blockDim.y);
-
-    // Process all of the lines
-    if (y < args.h)
-    {
-        unsigned buf_start = y * n_interp * args.b;
-
-        uchar* ref = PixelAddress(m_reference, 0, y, 0);
-        uchar* mtc = PixelAddress(m_matching, 0, y, 0);
-        int*  buf0 = &(buffs.buffer0[buf_start]);
-        int*  buf1 = &(buffs.buffer1[buf_start]);
-        int*  min0 = &(buffs.min_bf0[buf_start]);
-        int*  max0 = &(buffs.max_bf0[buf_start]);
-        int*  min1 = &(buffs.min_bf1[buf_start]);
-        int*  max1 = &(buffs.max_bf1[buf_start]);
-
-        // Fill the line buffers
-        for (int x = 0, l = 0, m = 0; x < args.w; x++, m += args.m_disp_den*args.b)
-        {
-            for (int k = 0; k < args.b; k++, l++)
-            {
-                buf0[m + k] = (int)ref[l];
-                buf1[m + k] = (int)mtc[l];
-            }
-        }
-
-        // Interpolate the matching signal
-        if (args.m_disp_den > 1)
-        {
-            InterpolateLine(buf1, args.m_disp_den, args.w, args.b, args.match_interp);
-            InterpolateLine(buf0, args.m_disp_den, args.w, args.b, args.match_interp);
-        }
-
-        if (args.match_interval) {
-            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, args.b);
-            if (args.match_interpolated)
-                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, args.b);
-        }
-
-        // Compute the costs, one disparity at a time
-        for (int k = 0; k < args.m_disp_n; k++)
-        {
-            int disp = -args.m_frame_diff_sign * (args.m_disp_den * args.disp_min + k * args.m_disp_num);
-
-            MatchLineStruct lineArgs = {
-                args.w,
-                args.b,
-                args.match_interpolated, //match_interpolated
-                (args.match_interval) ? (args.match_interpolated) ? min0 : buf0 : buf0, // rmn
-                (args.match_interval) ? (args.match_interpolated) ? max0 : buf0 : 0, // rmx
-                (args.match_interval) ? min1 : buf1, // mmn
-                (args.match_interval) ? max1 : 0, // mmx
-                args.m_disp_n,
-                disp,
-                args.m_disp_den,
-                args.match_fn,
-                args.match_max,
-                args.match_outside
-            };
-            
-            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), cost1, y*cost1_width);
-        }
-    }
-}
-
 // Return the 1-D coordinate of the band pixel
 __device__ int PixelCoordToAbs(ImageSizeStruct size, int x, int y, int band)
 {
-    return y * size.width + x * size.bands + band;
+    return y * size.width * size.bands + x * size.bands + band;
 }
 
 // Return pointer to the address of the specified band pixel
