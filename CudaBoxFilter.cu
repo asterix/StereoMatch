@@ -17,16 +17,21 @@
 extern Timer* profilingTimer2;
 
                                                                
-
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // Kernel Prototypes
+///////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename T>
-__global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, int WindowSize);
+__global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape);
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 // Kernel definitions
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 // BoxFiltering over variable window sizes
 template <typename T>
-__global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, int WindowSize)
+__global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape)
 {
     // Allow input tile to be stored in shared memory - Input is bigger than output tile
     __shared__ T Img[BOX_BLOCK_SIZE][BOX_BLOCK_SIZE];
@@ -36,7 +41,7 @@ __global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, in
     float Sum;
 
     // Offset is basically the dimension of the extending halo
-    int Offset = (int)WindowSize / 2;
+    int Offset = (int)BOX_WINDOW_SIZE / 2;
 
     int N_x = blockIdx.x * BOX_TILE_SIZE + tix - Offset;
     int N_y = blockIdx.y * BOX_TILE_SIZE + tiy - Offset;
@@ -53,7 +58,7 @@ __global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, in
     int OffY = tix - Offset;
 
     // Boxfilter averaging elements
-    int Avg = WindowSize * WindowSize;
+    int Avg = BOX_WINDOW_SIZE * BOX_WINDOW_SIZE;
 
     // Go over all depth layers (channels)
     for (int c = 0; c < srcShape.nBands; c++)
@@ -77,9 +82,9 @@ __global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, in
         // Accumulate and average - filtering non-halo threads in each block
         if ((tix >= Offset && tix < RBound) && (tiy >= Offset && tiy < RBound))
         {
-            for (int i = 0; i < WindowSize; i++)
+            for (int i = 0; i < BOX_WINDOW_SIZE; i++)
             {
-                for (int j = 0; j < WindowSize; j++)
+                for (int j = 0; j < BOX_WINDOW_SIZE; j++)
                 {
                     Sum += Img[OffX + i][OffY + j];
                 }
@@ -98,6 +103,10 @@ __global__ void BoxFilterXY(T* DevInBuffer, T* DevOutBuffer, CShape srcShape, in
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// CPU-GPU Host Wrappers
+///////////////////////////////////////////////////////////////////////////////////////////////////
 template <class T>
 void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
 {
@@ -107,10 +116,7 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
     // GPU memories
     T *DevInBuffer, *DevOutBuffer;
 
-    // Internal profiling
-    profilingTimer2 = new Timer;
     profilingTimer2->startTimer();
-
     // Allocate memory to copy all image/cost-map channels to GPU
     int AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
     AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
@@ -121,20 +127,26 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
     // Transfer everything to GPU
     T *StartAddr = &src.Pixel(0, 0, 0);
     CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
-
-    printf("\nCopy to GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
+    printf("\nMemCpy to GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Set kernel parameters and launch kernel
     dim3 Grid(ceil((float)srcShape.width / BOX_TILE_SIZE), ceil((float)srcShape.height / BOX_TILE_SIZE), 1);
     dim3 Block(BOX_BLOCK_SIZE, BOX_BLOCK_SIZE, 1);
-    BoxFilterXY<< <Grid, Block >> >(DevInBuffer, DevOutBuffer, srcShape, WindowSize);
 
+    profilingTimer2->startTimer();
+    BoxFilterXY<< <Grid, Block >> >(DevInBuffer, DevOutBuffer, srcShape);
+
+    // Wait for all blocks to finish
     cudaDeviceSynchronize();
+    printf("\nBoxFilter kernel execution time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
+
 
     // Copy computed elements back to CPU memory
+    profilingTimer2->startTimer();
     dst.ReAllocate(srcShape, false);
     T *DestStartAddr = &dst.Pixel(0, 0, 0);
     CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+    printf("\nMemCpy from GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Free GPU memory
     FreeGPUMemory(DevInBuffer);
@@ -143,9 +155,12 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
 
 
 
-// Instantiate templated functions
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Templated functions' instantiation
+///////////////////////////////////////////////////////////////////////////////////////////////////
 template void CudaBoxFilterXY<float>(class CImageOf<float>, class CImageOf<float> &, int);
 template void CudaBoxFilterXY<unsigned char>(class CImageOf<unsigned char>, class CImageOf<unsigned char> &, int);
 template void CudaBoxFilterXY<int>(class CImageOf<int>, class CImageOf<int> &, int);
 
-template __global__ void BoxFilterXY<float>(float *, float *, struct CShape, int);
+template __global__ void BoxFilterXY<float>(float *, float *, struct CShape);

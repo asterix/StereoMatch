@@ -189,6 +189,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
         v_kernel.Pixel(0, k, 0) = y_kernel.Pixel(k, 0, 0);
     v_kernel.origin[1] = y_kernel.origin[0];
 
+    // Modifications for integrating CUDA kernels
     BinomialFilterType type;
 
     profilingTimer->startTimer();
@@ -208,7 +209,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
            assert(false);
     }
 
-
+    // Skip copy if decimation is not required
     if (decimate != 1) CudaConvolveXY(src, tmpImg2, type); 
     else CudaConvolveXY(src, dst, type);
 
@@ -222,12 +223,12 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
     Convolve(src, tmpImg1, x_kernel, 1.0f, 0.0f);
     Convolve(tmpImg1, tmpImg2, v_kernel, scale, offset);
 
-    printf("\nCPU Convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());*/
+    printf("\nCPU Convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 #endif
 
     profilingTimer->startTimer();
     // Downsample or copy
-    // Skip decimate and recopy is not required
+    // Skip decimate and recopy if not required
     if (decimate != 1)
     {
        for (int y = 0; y < dShape.height; y++)
@@ -244,7 +245,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
            }
        }
     }
-    printf("\nDecimate/Recopy takes = %f ms\n", profilingTimer->stopAndGetTimerValue());
+    printf("\nDecimate/Recopy took = %f ms\n", profilingTimer->stopAndGetTimerValue());
 }
 
 template <class T>
