@@ -24,6 +24,8 @@
 #include "CudaBoxFilter.h"
 #include "CudaUtilities.h"
 
+//test
+
 extern Timer* profilingTimer;
 
 static int borderIndex(int index, int len, EBorderMode m) {
