@@ -123,7 +123,7 @@ float* CStereoMatcher::RawCostsGPU()
     match_interval = (match_interval ? 1 : 0);  // force to [0,1]
     int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
-    m_match_outside = __min(worst_match, cutoff);	// trim to cutoff
+    m_match_outside = (float)__min(worst_match, cutoff);	// trim to cutoff
 
     // Allocate a buffer for interpolated values
     //  Note that we don't have to interpolate the ref image if we
@@ -151,7 +151,7 @@ float* CStereoMatcher::RawCostsGPU()
     // cuda function call
     LineProcess(m_reference, m_matching, m_cost, args);
 
-    printf("\GPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+    printf("\nGPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)
@@ -212,7 +212,7 @@ float* CStereoMatcher::RawCostsCPU()
     // Special value for border matches
     int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
-    m_match_outside = __min(worst_match, cutoff);	// trim to cutoff
+    m_match_outside = (float)__min(worst_match, cutoff);	// trim to cutoff
 
     // Process all of the lines
     for (int y = 0; y < h; y++)
@@ -274,7 +274,7 @@ float* CStereoMatcher::RawCostsCPU()
             MatchLineHost(args, &m_cost.Pixel(0, y, k));
         }
     }
-    printf("\CPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+    printf("\nCPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 
     // Write out the different disparity images
     if (verbose >= eVerboseDumpFiles)

@@ -14,7 +14,7 @@
 
 #include "StcRawCost.h"
 
-#define PREALLOC_BUFF (0) // size of pre-allocated buffers to use in each thread (set to 0 to use dynamic allocation)
+extern Timer* profilingTimer2;
 
 // Serial / Parallel implementation
 
@@ -101,11 +101,7 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
     int cutoff = (args.match_fn == eSD) ? args.match_max * args.match_max : abs(args.match_max);
     // TODO:  cutoff is not adjusted for the number of bands...
 
-#if PREALLOC_BUFF
-    float cost1[PREALLOC_BUFF];
-#else
     float* cost1 = cost1_in;
-#endif
 
     // Match valid pixels
     float  left_cost = BAD_COST;
@@ -193,14 +189,6 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
         uchar* ref = PixelAddress(m_reference, 0, y, 0);
         uchar* mtc = PixelAddress(m_matching, 0, y, 0);
 
-#if PREALLOC_BUFF
-        int  buf0[PREALLOC_BUFF];
-        int  buf1[PREALLOC_BUFF];
-        int  min0[PREALLOC_BUFF];
-        int  max0[PREALLOC_BUFF];
-        int  min1[PREALLOC_BUFF];
-        int  max1[PREALLOC_BUFF];
-#else
         unsigned buf_start = y * args.n_interp * args.b;
         int*  buf0 = &(buffs.buffer0[buf_start]);
         int*  buf1 = &(buffs.buffer1[buf_start]);
@@ -208,7 +196,6 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
         int*  max0 = &(buffs.max_bf0[buf_start]);
         int*  min1 = &(buffs.min_bf1[buf_start]);
         int*  max1 = &(buffs.max_bf1[buf_start]);
-#endif
 
         // Fill the line buffers
         for (int x = 0, l = 0, m = 0; x < args.w; x++, m += args.m_disp_den*args.b)
@@ -262,12 +249,13 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
 void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_cost, LineProcessStruct args)
 {
     
+    profilingTimer2->startTimer();
 
     // Allocate working buffers
     BufferStruct buffs;
     int buf_length = args.n_interp * args.b; // size of one row
     int buf_size = args.h * buf_length * sizeof(int);
-
+    
     AllocateGPUMemory((void**)&(buffs.buffer0), buf_size, false);
     AllocateGPUMemory((void**)&(buffs.buffer1), buf_size, false);
     AllocateGPUMemory((void**)&(buffs.min_bf0), buf_size, false);
@@ -307,6 +295,10 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     m_cost_struct.imageSize = PopulateImageSizeStruct(m_cost);
     m_cost_struct.image = m_cost_d;
 
+    printf("\nGPU Raw Costs memory allocation & copy: Time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
+
+    profilingTimer2->startTimer();
+
     // Block/Grid size
     dim3 gridSize, blockSize(1, BLOCKSIZE, 1);
     gridSize.y = (unsigned int)ceil((float)(args.h) / (float)blockSize.y);
@@ -315,6 +307,10 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     LineProcessKernel <<<gridSize, blockSize >>>(m_ref_struct, m_match_struct, m_cost_struct, cost1_d, cost1_width, buffs, args);
 
     GPUERRORCHECK(cudaDeviceSynchronize());
+
+    printf("\nGPU Raw Costs kernel call: Time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
+
+    profilingTimer2->startTimer();
 
     // Copy cost data to host
     CopyGPUMemory(m_cost.PixelAddress(0, 0, 0), m_cost_d, m_cost_size, false);
@@ -331,6 +327,8 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     FreeGPUMemory(m_match_d);
     FreeGPUMemory(m_cost_d);
     FreeGPUMemory(cost1_d);
+
+    printf("\nGPU Raw Costs results transfer & clean-up: Time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 }
 
 // Helper functions
