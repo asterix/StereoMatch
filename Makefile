@@ -192,15 +192,21 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-SRC = BoxFilter.cpp Convert.cpp Convolve.cpp Histogram1D.cpp Image.cpp ImageIO.cpp main.cpp MinFilter.cpp ParameterIO.cpp RefCntMem.cpp StcAggregate.cpp StcDiffusion.cpp StcEvaluate.cpp StcGraphCut.cpp StcOptDP.cpp StcOptimize.cpp StcOptSO.cpp StcPreProcess.cpp StcRawCosts.cpp StcRefine.cpp StcSimulAnn.cpp StereoIO.cpp StereoMatcher.cpp StereoParameters.cpp Warp1D.cpp vectoradd_gold.cpp
+SRC = BoxFilter.cpp Convert.cpp Convolve.cpp Histogram1D.cpp Image.cpp ImageIO.cpp main.cpp MinFilter.cpp ParameterIO.cpp RefCntMem.cpp StcAggregate.cpp StcDiffusion.cpp StcEvaluate.cpp StcGraphCut.cpp StcOptDP.cpp StcOptimize.cpp StcOptSO.cpp StcPreProcess.cpp StcRawCosts.cpp StcRefine.cpp StcSimulAnn.cpp StereoIO.cpp StereoMatcher.cpp StereoParameters.cpp Warp1D.cpp
 
 HDR = BoxFilter.h Convert.h Convolve.h Copyright.h Error.h Histogram1D.h Image.h ImageIO.h MinFilter.h ParameterIO.h RefCntMem.h StereoIO.h StereoMatcher.h StereoParameters.h Verbose.h Warp1D.h
 
-vectoradd.o:vectoradd.cu 
+CudaConvolve.o:CudaConvolve.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+CudaUtilities.o:CudaUtilities.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+CudaBoxFilter.o:CudaBoxFilter.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 
-OBJ = $(SRC:.cpp=.o) maxflow/maxflow.o vectoradd.o
+OBJ = $(SRC:.cpp=.o) maxflow/maxflow.o CudaConvolve.o CudaUtilities.o CudaBoxFilter.o
 StereoMatch: $(OBJ)
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
