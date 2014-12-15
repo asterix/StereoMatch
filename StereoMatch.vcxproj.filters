@@ -9,10 +9,6 @@
       <UniqueIdentifier>{9a6627f0-1464-44c2-91e3-f3153c44f7ba}</UniqueIdentifier>
       <Extensions>h;hpp;hxx;hm;inl</Extensions>
     </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{55b383be-e10d-454c-b224-3b7893549344}</UniqueIdentifier>
-      <Extensions>ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BoxFilter.cpp">
@@ -146,8 +142,28 @@
     <ClInclude Include="Warp1D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CudaConvolve.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaUtilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaBoxFilter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="README-StereoMatch.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="CudaUtilities.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CudaConvolve.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CudaBoxFilter.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

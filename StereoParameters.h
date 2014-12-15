@@ -19,6 +19,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef STEREOPARAMETERS_H
+#define STEREOPARAMETERS_H
 
 #include <stdio.h>
 #include <vector>
@@ -267,3 +269,4 @@ struct CStereoParameters : public
         // Initialize parameter input/output object
 };
 
+#endif

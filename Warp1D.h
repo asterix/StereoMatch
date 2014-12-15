@@ -30,6 +30,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef WARP1D_H
+#define WARP1D_H
 
 template <class T>
 void ForwardWarp(CImageOf<T>& src, CImageOf<T>& dst, CFloatImage& disp,
@@ -40,3 +42,5 @@ void InverseWarp(CImageOf<T>& src, CImageOf<T>& dst, CFloatImage& disp,
                  float d_scale, float eval_disp_gap, int order);
 
 float CubicInterpolate(float x0, float v0, float v1, float v2, float v3);
+
+#endif

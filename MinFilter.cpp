@@ -215,10 +215,12 @@ extern void MaxFilter(CImageOf<T>& src, CImageOf<T>& dst,
     MinMaxFilter(src, dst, xWidth, yWidth, true);
 }
 
+
 // Have no idea why instantiation in CallMinFilters doesn't work on gcc
 template void MinFilter<float>(CImageOf<float>&, CImageOf<float>&, int, int);
 template void MinFilter<unsigned char>(CImageOf<unsigned char>&, CImageOf<unsigned char>&, int, int);
 template void MaxFilter<unsigned char>(CImageOf<unsigned char>&, CImageOf<unsigned char>&, int, int);
+
 
 extern void CallMinFilters(void)
 {

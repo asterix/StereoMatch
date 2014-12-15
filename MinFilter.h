@@ -25,6 +25,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef MINFILTER_H
+#define MINFILTER_H
 
 template <class T>
 void MinFilter(CImageOf<T>& src, CImageOf<T>& dst,
@@ -33,3 +35,5 @@ void MinFilter(CImageOf<T>& src, CImageOf<T>& dst,
 template <class T>
 void MaxFilter(CImageOf<T>& src, CImageOf<T>& dst,
                int xWidth, int yWidth);
+
+#endif

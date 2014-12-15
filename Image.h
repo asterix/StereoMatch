@@ -29,6 +29,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef IMAGE_H
+#define IMAGE_H
 
 namespace std {}
 using namespace std;
@@ -251,3 +253,5 @@ struct RGBA
 {
     PixType B, G, R, A;     // A channel is highest one
 };
+
+#endif
