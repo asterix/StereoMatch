@@ -31,9 +31,11 @@ int main(int argc, const char *argv[])
     CStereoIO s;
 
     // Initialization to work with CUDA capable GPU
+    prepareDevice();
+
     profilingTimer = new Timer;
     profilingTimer2 = new Timer;
-    FreeGPUMemory(0); // Create a context for this process on the GPU - GPU-Attach
+    
 
     try
     {

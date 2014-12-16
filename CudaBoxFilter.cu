@@ -134,6 +134,7 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
     dim3 Block(BOX_BLOCK_SIZE, BOX_BLOCK_SIZE, 1);
 
     profilingTimer2->startTimer();
+    GPUERRORCHECK(cudaFuncSetCacheConfig(BoxFilterXY<float>, cudaFuncCachePreferL1))
     BoxFilterXY<< <Grid, Block >> >(DevInBuffer, DevOutBuffer, srcShape);
 
     // Wait for all blocks to finish
