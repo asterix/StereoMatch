@@ -12,6 +12,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "RefCntMem.h"
+#include "CudaUtilities.h"
 
 CRefCntMem::CRefCntMem()
 {
@@ -39,7 +40,8 @@ void CRefCntMem::DecrementCount()
                 if (m_ptr->m_delFn)
                     m_ptr->m_delFn(m_ptr->m_memory);
                 else
-                    delete (double *) m_ptr->m_memory;
+                    GPUERRORCHECK(cudaFreeHost(m_ptr->m_memory))
+                    //delete (double *) m_ptr->m_memory;
             }
             delete m_ptr;
         }

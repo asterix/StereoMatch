@@ -217,14 +217,22 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
 
     // Allocate memory to copy all image/cost-map channels to GPU
     int AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
-    AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
+    //AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
 
     // Allocate memory for output
-    AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
+    //AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
 
     // Transfer everything to GPU
     T *StartAddr = &src.Pixel(0, 0, 0);
-    CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
+
+    dst.ReAllocate(srcShape, false);
+    T *DestStartAddr = &dst.Pixel(0, 0, 0);
+
+    //CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
+    GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevInBuffer, (void *)StartAddr, 0))
+    GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevOutBuffer, (void *)DestStartAddr, 0))
+
+
     printf("\nMemCpy to GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Set kernel parameters and launch kernel
@@ -263,14 +271,14 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
 
     // Copy computed elements back to CPU memory
     profilingTimer2->startTimer();
-    dst.ReAllocate(srcShape, false);
-    T *DestStartAddr = &dst.Pixel(0, 0, 0);
-    CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+    //dst.ReAllocate(srcShape, false);
+    //T *DestStartAddr = &dst.Pixel(0, 0, 0);
+    //CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
     printf("\nMemCpy from GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Free GPU memory
-    FreeGPUMemory(DevInBuffer);
-    FreeGPUMemory(DevOutBuffer);
+    //FreeGPUMemory(DevInBuffer);
+    //FreeGPUMemory(DevOutBuffer);
 }
 
 

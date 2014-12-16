@@ -91,6 +91,10 @@ VerifyComputedData(float* reference, float* data, int numElems)
 void
 prepareDevice(void)
 {
+   // Zero copy - exploit unified physical CPU-GPU memory by pinning host memory
+   // Doesn't need MemCpy anymore!
+   GPUERRORCHECK(cudaSetDeviceFlags(cudaDeviceMapHost))
+
    // Get device properties
    int devices;
    GPUERRORCHECK(cudaGetDeviceCount(&devices))
@@ -101,7 +105,7 @@ prepareDevice(void)
    }
 
    // Create a context for this process on the GPU - GPU-Attach
-   FreeGPUMemory(0); 
+   FreeGPUMemory(0);
 
    // Set L1 cache preference mode
    // This is done just before kernel call
