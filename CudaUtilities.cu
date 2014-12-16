@@ -18,6 +18,8 @@
 Timer *profilingTimer;
 Timer *profilingTimer2;
 
+bool ZeroCopySupported;
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //Timer methods
@@ -91,22 +93,32 @@ VerifyComputedData(float* reference, float* data, int numElems)
 void
 prepareDevice(void)
 {
-   // Zero copy - exploit unified physical CPU-GPU memory by pinning host memory
+   // Get device properties to check for page-locked memory mapping capability
+   int device;
+   
+   // Zero copy - exploit unified physical CPU-GPU memory by pinning all host memories
    // Doesn't need MemCpy anymore!
    GPUERRORCHECK(cudaSetDeviceFlags(cudaDeviceMapHost))
+   
+   ZeroCopySupported = false;
+   GPUERRORCHECK(cudaGetDeviceCount(&device))
 
-   // Get device properties
-   int devices;
-   GPUERRORCHECK(cudaGetDeviceCount(&devices))
-
-   if (devices == 0)
+   if (device == 0)
    {
       throw CError("No CUDA GPUs found");
    }
 
    // Create a context for this process on the GPU - GPU-Attach
-   FreeGPUMemory(0);
+   FreeGPUMemory(0); 
 
-   // Set L1 cache preference mode
-   // This is done just before kernel call
+   // Just check the first device
+   cudaDeviceProp prop;
+   GPUERRORCHECK(cudaGetDeviceProperties(&prop, 0))
+
+   //if (prop.canMapHostMemory == 1) ZeroCopySupported = true;
+
+   printf("GPU used: %s , Zero-Copy support: %d\n", prop.name, ZeroCopySupported);
+   GPUERRORCHECK(cudaSetDevice(0));
+
+   // Setting of L1 cache preference mode is done just before kernel call
 }

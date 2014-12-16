@@ -14,6 +14,6 @@ verbose 5       # just the summary
   # University of Tsukuba "Lamp" sequence with manually established ground truth
   # used by permission
   # color, 5 images (1..5), use 3 and 4 
-cd tsukuba
+cd ../tsukuba
 script ../Scripts/exp_dispatch.txt
 

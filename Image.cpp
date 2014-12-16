@@ -15,6 +15,8 @@
 #include "Error.h"
 #include "CudaUtilities.h"
 
+extern bool ZeroCopySupported;
+
 //
 // struct CShape: shape of image (width x height x nbands)
 //
@@ -97,8 +99,12 @@ void CImage::ReAllocate(CShape s, const type_info& ti, int bandSize,
     int nBytes  = m_rowSize * s.height;
     if (memory == 0 && nBytes > 0)          // allocate if necessary
     {
-        GPUERRORCHECK(cudaHostAlloc((void **)&memory, sizeof(double) * ((nBytes + 7) / 8), cudaHostAllocMapped))
-        //memory = new double[(nBytes + 7)/ 8];
+        // Page-locked memory allocation to enable Zero-Copy
+        if (ZeroCopySupported)
+           GPUERRORCHECK(cudaHostAlloc((void **)&memory, sizeof(double) * ((nBytes + 7) / 8), cudaHostAllocMapped))
+        else
+           memory = new double[(nBytes + 7)/ 8];
+
         if (memory == 0)
             throw CError("CImage::Reallocate: could not allocate %d bytes", nBytes);
     }

@@ -16,6 +16,7 @@
 
 // Profiling timers
 extern Timer* profilingTimer2;
+extern bool ZeroCopySupported;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Constant memory kernel definitions
@@ -209,30 +210,33 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
     // GPU memories
     T *DevInBuffer, *DevOutBuffer;
 
-    //DBG
-    //srcShape.width = 13;
-    //srcShape.height = 14;
-    
     profilingTimer2->startTimer();
-
-    // Allocate memory to copy all image/cost-map channels to GPU
-    int AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
-    //AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
-
-    // Allocate memory for output
-    //AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
-
-    // Transfer everything to GPU
+    // Get source and destination pointers
+    int AllocSize;
     T *StartAddr = &src.Pixel(0, 0, 0);
 
     dst.ReAllocate(srcShape, false);
     T *DestStartAddr = &dst.Pixel(0, 0, 0);
 
-    //CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
-    GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevInBuffer, (void *)StartAddr, 0))
-    GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevOutBuffer, (void *)DestStartAddr, 0))
+    // Allocate memory to copy all image/cost-map channels to GPU
+    if (!ZeroCopySupported)
+    {
+       AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
+       // Allocate in-data memory
+       AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
+       // Allocate memory for output
+       AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
 
-
+       // Transfer everything to GPU
+       CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
+    }
+    else
+    {
+        // Zero-Copy - No Alloc - No Copy - No Free
+        // Fast direct page-locked CPU-GPU access in unified physical memory architecture
+        GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevInBuffer, (void *)StartAddr, 0))
+        GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevOutBuffer, (void *)DestStartAddr, 0))
+    }
     printf("\nMemCpy to GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Set kernel parameters and launch kernel
@@ -240,7 +244,6 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
     dim3 Block(BLOCK_SIZE, BLOCK_SIZE, 1);
 
     // Copy the kernel to constant memory and execute kernel
-    // GPUERRORCHECK(cudaMemcpyToSymbol(Test, TestKern, sizeof(float) * TESTKERN * TESTKERN, 0, cudaMemcpyHostToDevice))
     profilingTimer2->startTimer();
     switch (filterType)
     {
@@ -271,16 +274,18 @@ void CudaConvolveXY(CImageOf<T> src, CImageOf<T>& dst, BinomialFilterType filter
 
     // Copy computed elements back to CPU memory
     profilingTimer2->startTimer();
-    //dst.ReAllocate(srcShape, false);
-    //T *DestStartAddr = &dst.Pixel(0, 0, 0);
-    //CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+    // Only if traditional copy-back is needed
+    if (!ZeroCopySupported)
+    {
+       CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+       
+       // Free GPU memory
+       FreeGPUMemory(DevInBuffer);
+       FreeGPUMemory(DevOutBuffer);
+    }
     printf("\nMemCpy from GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
-    // Free GPU memory
-    //FreeGPUMemory(DevInBuffer);
-    //FreeGPUMemory(DevOutBuffer);
 }
-
 
 
 

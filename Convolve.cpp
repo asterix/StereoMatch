@@ -228,7 +228,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
 
     profilingTimer->startTimer();
     // Downsample or copy
-    // Skip decimate and recopy if not required (on GPU)
+    // Skip decimate and recopy if not required
     if (decimate != 1)
     {
        for (int y = 0; y < dShape.height; y++)
