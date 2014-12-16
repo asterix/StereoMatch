@@ -15,6 +15,7 @@
 
 // Profiling timers
 extern Timer* profilingTimer2;
+extern bool ZeroCopySupported;
 
                                                                
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,16 +118,32 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
     T *DevInBuffer, *DevOutBuffer;
 
     profilingTimer2->startTimer();
-    // Allocate memory to copy all image/cost-map channels to GPU
-    int AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
-    AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
-
-    // Allocate memory for output
-    AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
-
-    // Transfer everything to GPU
+    // Get source and destination pointers
+    int AllocSize;
     T *StartAddr = &src.Pixel(0, 0, 0);
-    CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
+
+    dst.ReAllocate(srcShape, false);
+    T *DestStartAddr = &dst.Pixel(0, 0, 0);
+
+    // Allocate memory to copy all image/cost-map channels to GPU
+    if (!ZeroCopySupported)
+    {
+       AllocSize = sizeof(T) * srcShape.width * srcShape.height * srcShape.nBands;
+       // Allocate in-data memory
+       AllocateGPUMemory((void**)&DevInBuffer, AllocSize, false);
+       // Allocate memory for output
+       AllocateGPUMemory((void**)&DevOutBuffer, AllocSize, false);
+
+       // Transfer everything to GPU
+       CopyGPUMemory((void*)DevInBuffer, (void*)StartAddr, AllocSize, true);
+    }
+    else
+    {
+        // Zero-Copy - No Alloc - No Copy - No Free
+        // Fast direct page-locked CPU-GPU access in unified physical memory architecture
+        GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevInBuffer, (void *)StartAddr, 0))
+        GPUERRORCHECK(cudaHostGetDevicePointer((void **)&DevOutBuffer, (void *)DestStartAddr, 0))
+    }
     printf("\nMemCpy to GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
     // Set kernel parameters and launch kernel
@@ -141,19 +158,20 @@ void CudaBoxFilterXY(CImageOf<T> src, CImageOf<T>& dst, int WindowSize)
     cudaDeviceSynchronize();
     printf("\nBoxFilter kernel execution time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
-
     // Copy computed elements back to CPU memory
     profilingTimer2->startTimer();
-    dst.ReAllocate(srcShape, false);
-    T *DestStartAddr = &dst.Pixel(0, 0, 0);
-    CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+    // Only if traditional copy-back is needed
+    if (!ZeroCopySupported)
+    {
+       CopyGPUMemory((void*)DestStartAddr, (void*)DevOutBuffer, AllocSize, false);
+       
+       // Free GPU memory
+       FreeGPUMemory(DevInBuffer);
+       FreeGPUMemory(DevOutBuffer);
+    }
     printf("\nMemCpy from GPU time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 
-    // Free GPU memory
-    FreeGPUMemory(DevInBuffer);
-    FreeGPUMemory(DevOutBuffer);
 }
-
 
 
 

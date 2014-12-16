@@ -12,6 +12,9 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "RefCntMem.h"
+#include "CudaUtilities.h"
+
+extern bool ZeroCopySupported;
 
 CRefCntMem::CRefCntMem()
 {
@@ -39,7 +42,14 @@ void CRefCntMem::DecrementCount()
                 if (m_ptr->m_delFn)
                     m_ptr->m_delFn(m_ptr->m_memory);
                 else
-                    delete (double *) m_ptr->m_memory;
+                {
+                   // Page-locked memory free - Zero-Copy
+                   //if (ZeroCopySupported) 
+                   // Page-locked memory is used always
+                   GPUERRORCHECK(cudaFreeHost(m_ptr->m_memory))
+                   //else 
+                   //   delete (double *) m_ptr->m_memory;
+                }
             }
             delete m_ptr;
         }
