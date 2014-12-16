@@ -209,6 +209,18 @@ float* CStereoMatcher::RawCostsCPU()
     min_bf1.resize(buffer_length);
     max_bf1.resize(buffer_length);
 
+    int*  buf0 = &buffer0[0];
+    int*  buf1 = &buffer1[0];
+    int*  min0 = &min_bf0[0];
+    int*  max0 = &max_bf0[0];
+    int*  min1 = &min_bf1[0];
+    int*  max1 = &max_bf1[0];
+
+    int cost_len = (w - 1)*m_disp_den + 1;             // number of reference pixels
+    std::vector<float> cost1_vect;
+    cost1_vect.resize(cost_len);
+    float* cost1 = &cost1_vect[0];
+
     // Special value for border matches
     int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
@@ -217,14 +229,9 @@ float* CStereoMatcher::RawCostsCPU()
     // Process all of the lines
     for (int y = 0; y < h; y++)
     {
+        
         uchar* ref = &m_reference.Pixel(0, y, 0);
         uchar* mtc = &m_matching.Pixel(0, y, 0);
-        int*  buf0 = &buffer0[0];
-        int*  buf1 = &buffer1[0];
-        int*  min0 = &min_bf0[0];
-        int*  max0 = &max_bf0[0];
-        int*  min1 = &min_bf1[0];
-        int*  max1 = &max_bf1[0];
 
         // Fill the line buffers
         int x, l, m;
@@ -271,7 +278,7 @@ float* CStereoMatcher::RawCostsCPU()
                 match_max,
                 m_match_outside
             };
-            MatchLineHost(args, &m_cost.Pixel(0, y, k));
+            MatchLine(args, &m_cost.Pixel(0, y, k), cost1);
         }
     }
     printf("\nCPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
@@ -292,89 +299,6 @@ float* CStereoMatcher::RawCostsCPU()
 
 #endif
 }
-
-void MatchLineHost(MatchLineStruct args, float* cost)
-{
-    // Set up the starting addresses, pointers, and cutoff value
-    int n = (args.w - 1)*args.m_disp_den + 1;             // number of reference pixels
-    int s = (args.interpolated) ? 1 : args.m_disp_den;     // skip in reference pixels
-    std::vector<float> cost1;
-    cost1.resize(n);
-    int cutoff = (args.match_fn == eSD) ? args.match_max * args.match_max : abs(args.match_max);
-    // TODO:  cutoff is not adjusted for the number of bands...
-
-    // Match valid pixels
-    float  left_cost = BAD_COST;
-    float right_cost = BAD_COST;
-    int x, y;
-    for (x = 0; x < n; x += s)
-    {
-        // Compute ref and match pointers
-        cost1[x] = BAD_COST;
-        int x_r = x, x_m = x + args.disp;
-        if (x_m < 0 || x_m >= n)
-            continue;
-        int* rn = &(args.rmn[x_r*args.b]);    // pointer to ref or min pixel(s)
-        int* rx = &(args.rmx[x_r*args.b]);    // pointer to ref    max pixel(s)
-        int* mn = &(args.mmn[x_m*args.b]);    // pointer to mtc or min pixel(s)
-        int* mx = &(args.mmx[x_m*args.b]);    // pointer to mtc    max pixel(s)
-        int  diff_sum = 0;        // accumulated error
-
-        // This code could be special-cased for b==1 for more efficiency...
-        for (int ib = 0; ib < args.b; ib++)
-        {
-            int diff1 = mn[ib] - rn[ib];    // straightforward difference
-            if (args.rmx && args.mmx)
-            {
-                // Compare intervals (see partial shuffle code in StcEvaluate.cpp)
-                int xn = __max(rn[ib], mn[ib]);     // max of mins
-                int nx = __min(rx[ib], mx[ib]);     // min of maxs
-                if (xn <= nx)
-                    diff1 = 0;          // overlapping ranges -> no error
-                else
-                    diff1 = (mn[ib] > rx[ib]) ?     // check sign
-                    mn[ib] - rx[ib] :
-                    rn[ib] - mx[ib];          // gap between intervals
-            }
-            int diff2 = (args.match_fn == eSD) ?    // squared or absolute difference
-                diff1 * diff1 : abs(diff1);
-            diff_sum += diff2;
-        }
-        int diff3 = __min(diff_sum, cutoff);    // truncated difference
-        if (left_cost == BAD_COST)
-            left_cost = (float)diff3;  // first cost computed
-        right_cost = (float)diff3;     // last  cost computed
-        cost1[x] = (float)diff3;        // store in temporary array
-    }
-
-    // Fill in the left and right edges
-    if (UNDEFINED_COST)
-        left_cost = right_cost = args.match_outside;
-    for (x = 0; x < n && cost1[x] == BAD_COST; x += s)
-        cost1[x] = left_cost;
-    for (x = n - 1; x >= 0 && cost1[x] == BAD_COST; x -= s)
-        cost1[x] = right_cost;
-
-    // Box filter if interpolated costs
-    int dh = args.m_disp_den / 2;
-    float box_scale = 1.0 / (2 * dh + 1);
-    for (x = 0, y = 0; y < args.w*args.m_disp_n; x += args.m_disp_den, y += args.m_disp_n)
-    {
-        if (args.interpolated && args.m_disp_den > 1)
-        {
-            float sum = 0;
-            for (int k = -dh; k <= dh; k++)
-            {
-                int l = __max(0, __min(n - 1, x + k));  // TODO: make more efficient
-                sum += cost1[l];
-            }
-            cost[y] = (float)(int)(box_scale * sum + 0.5);
-        }
-        else
-            cost[y] = cost1[x];
-    }
-}
-
 
 static void PadLine(int w, int b, float cost[],
                     int m_disp_n, int disp, int disp_den,

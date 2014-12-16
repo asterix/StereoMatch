@@ -101,8 +101,7 @@ struct BufferStruct
 // Raw Cost standard functions
 __host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
 __host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
-__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in);
-void MatchLineHost(MatchLineStruct args, float* cost);
+__host__ __device__ void MatchLine(MatchLineStruct args, float* cost, float* cost1_in);
 
 // Raw Cost helper functions
 __host__ __device__ float CubicInterpolateRC(float x0, float v0, float v1, float v2, float v3);

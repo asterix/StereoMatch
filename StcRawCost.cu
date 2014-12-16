@@ -95,7 +95,7 @@ __host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf,
     }
 }
 
-__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1)
+__host__ __device__ void MatchLine(MatchLineStruct args, float* cost, float* cost1)
 {
     // Set up the starting addresses, pointers, and cutoff value
     int n = (args.w - 1)*args.m_disp_den + 1;             // number of reference pixels
@@ -142,9 +142,9 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1)
         }
         int diff3 = __min(diff_sum, cutoff);    // truncated difference
         if (left_cost == BAD_COST)
-            left_cost = diff3;  // first cost computed
-        right_cost = diff3;     // last  cost computed
-        cost1[x] = diff3;        // store in temporary array
+            left_cost = (float)diff3;  // first cost computed
+        right_cost = (float)diff3;     // last  cost computed
+        cost1[x] = (float)diff3;        // store in temporary array
     }
 
     // Fill in the left and right edges
@@ -168,7 +168,7 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1)
                 int l = __max(0, __min(n - 1, x + k));  // TODO: make more efficient
                 sum += cost1[l];
             }
-            cost[y] = int(box_scale * sum + 0.5);
+            cost[y] = (float)(int)(box_scale * sum + 0.5);
         }
         else
             cost[y] = cost1[x];
@@ -297,7 +297,7 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
                 args.match_outside
             };
             
-            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), cost1);
+            MatchLine(lineArgs, PixelAddress(m_cost, 0, y, k), cost1);
         }
     }
 }
