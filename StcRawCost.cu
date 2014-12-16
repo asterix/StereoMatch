@@ -16,6 +16,8 @@
 
 extern Timer* profilingTimer2;
 
+#define SHARED_MEM (0)
+
 // Serial / Parallel implementation
 
 __host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp)     // interpolation function
@@ -93,15 +95,13 @@ __host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf,
     }
 }
 
-__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_in)
+__device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1)
 {
     // Set up the starting addresses, pointers, and cutoff value
     int n = (args.w - 1)*args.m_disp_den + 1;             // number of reference pixels
     int s = (args.interpolated) ? 1 : args.m_disp_den;     // skip in reference pixels
     int cutoff = (args.match_fn == eSD) ? args.match_max * args.match_max : abs(args.match_max);
     // TODO:  cutoff is not adjusted for the number of bands...
-
-    float* cost1 = cost1_in;
 
     // Match valid pixels
     float  left_cost = BAD_COST;
@@ -180,21 +180,66 @@ __device__ void MatchLineDevice(MatchLineStruct args, float* cost, float* cost1_
 __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar m_matching, ImageStructFloat m_cost,
     BufferStruct buffs, LineProcessStruct args)
 {
+
+#if SHARED_MEM
+    extern __shared__ int shared_mem[];
+
+    __shared__ int*  buf0_s;
+    __shared__ int*  buf1_s;
+    __shared__ int*  min0_s;
+    __shared__ int*  max0_s;
+    __shared__ int*  min1_s;
+    __shared__ int*  max1_s;
+    __shared__ float* cost1_s;
+#endif
+
     unsigned y = (threadIdx.y + blockIdx.y * blockDim.y);
+    int in_bounds = (y < args.h) ? 1 : 0;
+
+    uchar* ref;
+    uchar* mtc;
+
+    int*  buf0;
+    int*  buf1;
+    int*  min0;
+    int*  max0;
+    int*  min1;
+    int*  max1;
+    float* cost1;
 
     // Process all of the lines
-    if (y < args.h)
+    if (in_bounds)
     {
-        
-        uchar* ref = PixelAddress(m_reference, 0, y, 0);
-        uchar* mtc = PixelAddress(m_matching, 0, y, 0);
+#if SHARED_MEM
+        // break apart shared memory
+        buf0_s = shared_mem;
+        buf1_s = buf0_s + buffs.buffer0.num_elems;
+        min0_s = buf1_s + buffs.buffer1.num_elems;
+        max0_s = min0_s + buffs.min_bf0.num_elems;
+        min1_s = max0_s + buffs.max_bf0.num_elems;
+        max1_s = min1_s + buffs.min_bf1.num_elems;
+        cost1_s = (float*)(max1_s + buffs.max_bf1.num_elems);
 
-        int*  buf0 = &(buffs.buffer0.array[y * buffs.buffer0.width]);
-        int*  buf1 = &(buffs.buffer1.array[y * buffs.buffer1.width]);
-        int*  min0 = &(buffs.min_bf0.array[y * buffs.min_bf0.width]);
-        int*  max0 = &(buffs.max_bf0.array[y * buffs.max_bf0.width]);
-        int*  min1 = &(buffs.min_bf1.array[y * buffs.min_bf0.width]);
-        int*  max1 = &(buffs.max_bf1.array[y * buffs.max_bf1.width]);
+        // reassign start based on row
+        buf0 = &buf0_s[y * buffs.buffer0.width];
+        buf1 = &buf1_s[y * buffs.buffer1.width];
+        min0 = &min0_s[y * buffs.min_bf0.width];
+        max0 = &max0_s[y * buffs.max_bf0.width];
+        min1 = &min1_s[y * buffs.min_bf1.width];
+        max1 = &max1_s[y * buffs.max_bf1.width];
+        cost1 = &cost1_s[y * buffs.cost1.width];
+#else
+        buf0 = &(buffs.buffer0.array[y * buffs.buffer0.width]);
+        buf1 = &(buffs.buffer1.array[y * buffs.buffer1.width]);
+        min0 = &(buffs.min_bf0.array[y * buffs.min_bf0.width]);
+        max0 = &(buffs.max_bf0.array[y * buffs.max_bf0.width]);
+        min1 = &(buffs.min_bf1.array[y * buffs.min_bf1.width]);
+        max1 = &(buffs.max_bf1.array[y * buffs.max_bf1.width]);
+        cost1 = &(buffs.cost1.array[y * buffs.cost1.width]);
+#endif
+
+        ref = PixelAddress(m_reference, 0, y, 0);
+        mtc = PixelAddress(m_matching, 0, y, 0);
 
         // Fill the line buffers
         for (int x = 0, l = 0, m = 0; x < args.w; x++, m += args.m_disp_den*args.b)
@@ -205,20 +250,32 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
                 buf1[m + k] = (int)mtc[l];
             }
         }
+    }
+    __syncthreads();
 
+    if (in_bounds)
+    {
         // Interpolate the matching signal
         if (args.m_disp_den > 1)
         {
             InterpolateLine(buf1, args.m_disp_den, args.w, args.b, args.match_interp);
             InterpolateLine(buf0, args.m_disp_den, args.w, args.b, args.match_interp);
         }
+    }
+    __syncthreads();
 
+    if (in_bounds)
+    {
         if (args.match_interval) {
             BirchfieldTomasiMinMax(buf1, min1, max1, args.n_interp, args.b);
             if (args.match_interpolated)
                 BirchfieldTomasiMinMax(buf0, min0, max0, args.n_interp, args.b);
         }
+    }
+    __syncthreads();
 
+    if (in_bounds)
+    {
         // Compute the costs, one disparity at a time
         for (int k = 0; k < args.m_disp_n; k++)
         {
@@ -240,7 +297,7 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
                 args.match_outside
             };
             
-            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), &buffs.cost1.array[y * buffs.cost1.width]);
+            MatchLineDevice(lineArgs, PixelAddress(m_cost, 0, y, k), cost1);
         }
     }
 }
@@ -254,25 +311,35 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     BufferStruct buffs;
     int buf_width = args.n_interp * args.b; // size of one row (width)
     int buf_size = args.h * buf_width * sizeof(int); // in bytes
-    
+
+#if !SHARED_MEM    
     AllocateGPUMemory((void**)&(buffs.buffer0.array), buf_size, false);
-    Populate2DArray(&buffs.buffer0, buf_width, args.h);
     AllocateGPUMemory((void**)&(buffs.buffer1.array), buf_size, false);
-    Populate2DArray(&buffs.buffer1, buf_width, args.h);
     AllocateGPUMemory((void**)&(buffs.min_bf0.array), buf_size, false);
-    Populate2DArray(&buffs.min_bf0, buf_width, args.h);
     AllocateGPUMemory((void**)&(buffs.max_bf0.array), buf_size, false);
-    Populate2DArray(&buffs.max_bf0, buf_width, args.h);
     AllocateGPUMemory((void**)&(buffs.min_bf1.array), buf_size, false);
-    Populate2DArray(&buffs.min_bf1, buf_width, args.h);
     AllocateGPUMemory((void**)&(buffs.max_bf1.array), buf_size, false);
+#endif
+
+    Populate2DArray(&buffs.buffer0, buf_width, args.h);
+    Populate2DArray(&buffs.buffer1, buf_width, args.h);
+    Populate2DArray(&buffs.min_bf0, buf_width, args.h);
+    Populate2DArray(&buffs.max_bf0, buf_width, args.h);
+    Populate2DArray(&buffs.min_bf1, buf_width, args.h);
     Populate2DArray(&buffs.max_bf1, buf_width, args.h);
 
     int cost1_width = ((args.w - 1)*args.m_disp_den + 1);
-    int cost1_size = args.h * cost1_width * sizeof(float);
+    int cost1_size = args.h * cost1_width * sizeof(float); // in bytes
 
+#if !SHARED_MEM
     AllocateGPUMemory((void**)&(buffs.cost1.array), cost1_size, false);
+#endif
+
     Populate2DArray(&buffs.cost1, cost1_width, args.h);
+
+#if SHARED_MEM
+    unsigned int total_buf_size = buf_size * 6 + cost1_size; // in bytes
+#endif
 
     // Allocate input and output image data
     uchar* m_ref_d;
@@ -312,7 +379,11 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     gridSize.y = (unsigned int)ceil((float)(args.h) / (float)blockSize.y);
 
     // Kernel call
-    LineProcessKernel <<<gridSize, blockSize>>>(m_ref_struct, m_match_struct, m_cost_struct, buffs, args);
+#if !SHARED_MEM
+    LineProcessKernel<<<gridSize, blockSize>>>(m_ref_struct, m_match_struct, m_cost_struct, buffs, args);
+#else
+    LineProcessKernel<<<gridSize, blockSize, total_buf_size>>>(m_ref_struct, m_match_struct, m_cost_struct, buffs, args);
+#endif
 
     GPUERRORCHECK(cudaDeviceSynchronize());
 
@@ -324,6 +395,7 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     CopyGPUMemory(m_cost.PixelAddress(0, 0, 0), m_cost_d, m_cost_size, false);
 
     // Free the memory
+#if !SHARED_MEM
     FreeGPUMemory(buffs.buffer0.array);
     FreeGPUMemory(buffs.buffer1.array);
     FreeGPUMemory(buffs.min_bf0.array);
@@ -331,6 +403,7 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     FreeGPUMemory(buffs.min_bf1.array);
     FreeGPUMemory(buffs.max_bf1.array);
     FreeGPUMemory(buffs.cost1.array);
+#endif
 
     FreeGPUMemory(m_ref_d);
     FreeGPUMemory(m_match_d);

@@ -50,5 +50,13 @@ int main(int argc, const char *argv[])
     delete profilingTimer;
     delete profilingTimer2;
 
+#ifdef WIN32 // keep terminal open
+    fprintf(stderr, "\nPress any key to continue... ");
+    while (1) {
+        int c = getchar();
+        if (c != EOF) break;
+    }
+#endif
+
     return 0;
 }
