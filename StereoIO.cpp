@@ -287,8 +287,8 @@ void CStereoIO::RunMatcher()
     if (depth_map[0])
         ComputeCorrespondence();
 
-    if (output_params[0])
-        Evaluate();
+    //if (output_params[0])
+    //    Evaluate();
 }
 
 class CCommandLineParser
