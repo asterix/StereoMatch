@@ -168,7 +168,6 @@
     <CudaCompile Include="CudaConvolve.cu" />
     <CudaCompile Include="CudaUtilities.cu" />
     <CudaCompile Include="StcRawCost.cu" />
-    <CudaCompile Include="vectoradd.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

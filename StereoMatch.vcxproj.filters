@@ -171,8 +171,5 @@
     <CudaCompile Include="StcRawCost.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="vectoradd.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
   </ItemGroup>
 </Project>
