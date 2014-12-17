@@ -151,6 +151,9 @@
     <ClInclude Include="CudaBoxFilter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CudaRawCosts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="README-StereoMatch.txt" />
@@ -163,6 +166,9 @@
       <Filter>Source Files</Filter>
     </CudaCompile>
     <CudaCompile Include="CudaBoxFilter.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
+    <CudaCompile Include="CudaRawCosts.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
   </ItemGroup>

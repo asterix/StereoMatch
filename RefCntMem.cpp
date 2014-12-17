@@ -44,10 +44,11 @@ void CRefCntMem::DecrementCount()
                 else
                 {
                    // Page-locked memory free - Zero-Copy
-                   if (ZeroCopySupported) 
-                      GPUERRORCHECK(cudaFreeHost(m_ptr->m_memory))
-                   else 
-                      delete (double *) m_ptr->m_memory;
+                   //if (ZeroCopySupported) 
+                   // Page-locked memory is used always
+                   GPUERRORCHECK(cudaFreeHost(m_ptr->m_memory))
+                   //else 
+                   //   delete (double *) m_ptr->m_memory;
                 }
             }
             delete m_ptr;

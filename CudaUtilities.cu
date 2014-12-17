@@ -115,7 +115,10 @@ prepareDevice(void)
    cudaDeviceProp prop;
    GPUERRORCHECK(cudaGetDeviceProperties(&prop, 0))
 
-   //if (prop.canMapHostMemory == 1) ZeroCopySupported = true;
+   // Zero-Copy gives performance increase only when physical DRAM for CPU-GPU is unified
+   // Enabled only for TK1 Jetson
+   std::string gpuname(prop.name);
+   if ((prop.canMapHostMemory == 1) && (gpuname.find("GK20") != std::string::npos)) ZeroCopySupported = true;
 
    printf("GPU used: %s , Zero-Copy support: %d\n", prop.name, ZeroCopySupported);
    GPUERRORCHECK(cudaSetDevice(0));

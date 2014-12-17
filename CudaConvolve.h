@@ -3,7 +3,7 @@
 // CudaConvolve.h
 // 
 // 
-// This file contains prototypes and types used by CudaConvolve.cpp
+// This file contains prototypes and types used by CudaConvolve.cu
 //
 //
 //

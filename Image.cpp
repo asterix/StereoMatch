@@ -100,10 +100,11 @@ void CImage::ReAllocate(CShape s, const type_info& ti, int bandSize,
     if (memory == 0 && nBytes > 0)          // allocate if necessary
     {
         // Page-locked memory allocation to enable Zero-Copy
-        if (ZeroCopySupported)
-           GPUERRORCHECK(cudaHostAlloc((void **)&memory, sizeof(double) * ((nBytes + 7) / 8), cudaHostAllocMapped))
-        else
-           memory = new double[(nBytes + 7)/ 8];
+        //if (ZeroCopySupported)
+        // Use page-locked memory always - this always enhances performance
+        GPUERRORCHECK(cudaHostAlloc((void **)&memory, sizeof(double) * ((nBytes + 7) / 8), cudaHostAllocMapped))
+        //else
+        //memory = new double[(nBytes + 7)/ 8];
 
         if (memory == 0)
             throw CError("CImage::Reallocate: could not allocate %d bytes", nBytes);
