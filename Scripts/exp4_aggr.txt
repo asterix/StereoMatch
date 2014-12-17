@@ -1,0 +1,75 @@
+# exp4_aggr.txt
+
+# This script file lives in the subdirectory imagedirs/Scripts
+# and is called by 'exp_dispatch.txt', which in turn is called by 'exp_all.txt'
+
+# Experiment 4 in taxonomy paper:
+# compare different aggregation methods
+
+# use AD as matching cost, WTA optimization
+
+# aggregation methods:
+# - square windows with different window sizes
+# - square windows + minfilter with different window sizes
+# - binomial filter with different number of iterations
+# - diffusion with different different number of iterations
+# - membrane with different beta (fixed number of iter)
+ 
+reset
+
+eval_predict_type 0 # don't compute prediction errors
+eval_error_scale 0  # don't write _b and _e images
+
+##############################################################################
+
+match_fn 1 # absolute differences
+opt_fn 1   # WTA
+# exp4_aggr.txt
+
+# This script file lives in the subdirectory imagedirs/Scripts
+# and is called by 'exp_dispatch.txt', which in turn is called by 'exp_all.txt'
+
+# Experiment 4 in taxonomy paper:
+# compare different aggregation methods
+
+# use AD as matching cost, WTA optimization
+
+# aggregation methods:
+# - square windows with different window sizes
+# - square windows + minfilter with different window sizes
+# - binomial filter with different number of iterations
+# - diffusion with different different number of iterations
+# - membrane with different beta (fixed number of iter)
+ 
+reset
+
+eval_predict_type 0 # don't compute prediction errors
+eval_error_scale 0  # don't write _b and _e images
+
+##############################################################################
+#preproc_blur_iter 2
+
+match_fn 1 # absolute differences
+opt_fn 1   # WTA
+
+#  binomial filter (1 4 6 4 1), different numbers of iterations
+aggr_fn 2		# binomial
+aggr_minfilter 0
+
+depth_map results/SADbf02.pgm aggr_iter  2
+depth_map results/SADbf04.pgm aggr_iter  4
+depth_map results/SADbf06.pgm aggr_iter  6
+depth_map results/SADbf08.pgm aggr_iter  8
+depth_map results/SADbf10.pgm aggr_iter 10
+depth_map results/SADbf12.pgm aggr_iter 12
+depth_map results/SADbf14.pgm aggr_iter 14
+depth_map results/SADbf16.pgm aggr_iter 18
+depth_map results/SADbf18.pgm aggr_iter 18
+depth_map results/SADbf20.pgm aggr_iter 20
+depth_map results/SADbf22.pgm aggr_iter 22
+depth_map results/SADbf24.pgm aggr_iter 24
+depth_map results/SADbf26.pgm aggr_iter 26
+depth_map results/SADbf28.pgm aggr_iter 28
+
+
+
