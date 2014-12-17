@@ -15,7 +15,6 @@
 #include "StcRawCost.h"
 
 extern Timer* profilingTimer2;
-extern bool ZeroCopySupported;
 
 #define SHARED_MEM (0)
 
@@ -351,22 +350,14 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     int m_match_size = m_matching.ImageSize();
     int m_cost_size = m_cost.ImageSize();
 
-    if (!ZeroCopySupported)
-    {
-        AllocateGPUMemory((void**)&m_ref_d, m_ref_size, false);
-        AllocateGPUMemory((void**)&m_match_d, m_match_size, false);
-        AllocateGPUMemory((void**)&m_cost_d, m_cost_size, false);
+    AllocateGPUMemory((void**)&m_ref_d, m_ref_size, false);
+    AllocateGPUMemory((void**)&m_match_d, m_match_size, false);
+    AllocateGPUMemory((void**)&m_cost_d, m_cost_size, false);
 
-        // Copy image data to device
-        CopyGPUMemory(m_ref_d, m_reference.PixelAddress(0, 0, 0), m_ref_size, true);
-        CopyGPUMemory(m_match_d, m_matching.PixelAddress(0, 0, 0), m_match_size, true);
-    }
-    else // zero copy
-    {
-        GPUERRORCHECK(cudaHostGetDevicePointer((void**)&m_ref_d, (void*)m_reference.PixelAddress(0, 0, 0), 0));
-        GPUERRORCHECK(cudaHostGetDevicePointer((void**)&m_match_d, (void*)m_matching.PixelAddress(0, 0, 0), 0));
-        GPUERRORCHECK(cudaHostGetDevicePointer((void**)&m_cost_d, (void*)m_cost.PixelAddress(0, 0, 0), 0));
-    }
+    // Copy image data to device
+    CopyGPUMemory(m_ref_d, m_reference.PixelAddress(0, 0, 0), m_ref_size, true);
+    CopyGPUMemory(m_match_d, m_matching.PixelAddress(0, 0, 0), m_match_size, true);
+
     // Populate structs to hold picture info
     ImageStructUChar m_ref_struct, m_match_struct;
     ImageStructFloat m_cost_struct;
@@ -399,11 +390,8 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
 
     profilingTimer2->startTimer();
 
-    if (!ZeroCopySupported)
-    {
-        // Copy cost data to host
-        CopyGPUMemory(m_cost.PixelAddress(0, 0, 0), m_cost_d, m_cost_size, false);
-    }
+    // Copy cost data to host
+    CopyGPUMemory(m_cost.PixelAddress(0, 0, 0), m_cost_d, m_cost_size, false);
 
     // Free the memory
 #if !SHARED_MEM
@@ -416,12 +404,9 @@ void LineProcess(CByteImage m_reference, CByteImage m_matching, CFloatImage m_co
     FreeGPUMemory(buffs.cost1.array);
 #endif
 
-    if (!ZeroCopySupported)
-    {
-        FreeGPUMemory(m_ref_d);
-        FreeGPUMemory(m_match_d);
-        FreeGPUMemory(m_cost_d);
-    }
+    FreeGPUMemory(m_ref_d);
+    FreeGPUMemory(m_match_d);
+    FreeGPUMemory(m_cost_d);
 
     printf("\nGPU Raw Costs results transfer & clean-up: Time = %f ms\n", profilingTimer2->stopAndGetTimerValue());
 }
