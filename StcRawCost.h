@@ -26,10 +26,25 @@ struct ImageStructUChar
     uchar* image;
 };
 
+struct ImageStructInt
+{
+    ImageSizeStruct imageSize;
+    int* image;
+};
+
 struct ImageStructFloat
 {
     ImageSizeStruct imageSize;
     float* image;
+};
+
+struct TwoDUCharArray
+{
+    uchar* array;
+    int width;
+    int height;
+    int num_elems;
+    int size_bytes; // in bytes
 };
 
 struct TwoDIntArray
@@ -107,8 +122,10 @@ __host__ __device__ void MatchLineCuda(MatchLineStruct args, float* cost, float*
 __host__ __device__ float CubicInterpolateCuda(float x0, float v0, float v1, float v2, float v3);
 __device__ int PixelCoordToAbs(ImageSizeStruct size, int x, int y, int band);
 __device__ uchar* PixelAddress(ImageStructUChar image, int x, int y, int band);
+__device__ int* PixelAddress(ImageStructInt image, int x, int y, int band);
 __device__ float* PixelAddress(ImageStructFloat image, int x, int y, int band);
 ImageSizeStruct PopulateImageSizeStruct(CImage image);
+void Populate2DArray(TwoDUCharArray* value, int width, int height);
 void Populate2DArray(TwoDIntArray* value, int width, int height);
 void Populate2DArray(TwoDFloatArray* value, int width, int height);
 

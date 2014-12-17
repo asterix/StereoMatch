@@ -441,6 +441,12 @@ __device__ uchar* PixelAddress(ImageStructUChar image, int x, int y, int band)
 }
 
 // Return pointer to the address of the specified band pixel
+__device__ int* PixelAddress(ImageStructInt image, int x, int y, int band)
+{
+    return &image.image[PixelCoordToAbs(image.imageSize, x, y, band)];
+}
+
+// Return pointer to the address of the specified band pixel
 __device__ float* PixelAddress(ImageStructFloat image, int x, int y, int band)
 {
     return &image.image[PixelCoordToAbs(image.imageSize, x, y, band)];
@@ -458,6 +464,16 @@ ImageSizeStruct PopulateImageSizeStruct(CImage image)
         image.Shape().nBands
     };
     return size;
+}
+
+// Populates the TwoDUCharArray structure
+void Populate2DArray(TwoDUCharArray* value, int width, int height)
+{
+    value->width = width;
+    value->height = height;
+    value->num_elems = width * height;
+    value->size_bytes = width * height * sizeof(uchar);
+
 }
 
 // Populates the TwoDIntArray structure
