@@ -140,6 +140,7 @@
     <ClInclude Include="Copyright.h" />
     <ClInclude Include="CudaBoxFilter.h" />
     <ClInclude Include="CudaConvolve.h" />
+    <ClInclude Include="CudaRawCosts.h" />
     <ClInclude Include="CudaUtilities.h" />
     <ClInclude Include="Error.h" />
     <ClInclude Include="Histogram1D.h" />
@@ -161,6 +162,7 @@
   <ItemGroup>
     <CudaCompile Include="CudaBoxFilter.cu" />
     <CudaCompile Include="CudaConvolve.cu" />
+    <CudaCompile Include="CudaRawCosts.cu" />
     <CudaCompile Include="CudaUtilities.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

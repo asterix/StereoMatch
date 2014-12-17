@@ -3,7 +3,7 @@
 // CudaBoxFilter.h
 // 
 // 
-// This file contains prototypes and types used by CudaBoxFilter.cpp
+// This file contains prototypes and types used by CudaBoxFilter.cu
 //
 //
 //
