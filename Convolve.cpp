@@ -189,6 +189,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
         v_kernel.Pixel(0, k, 0) = y_kernel.Pixel(k, 0, 0);
     v_kernel.origin[1] = y_kernel.origin[0];
 
+#ifdef RUN_ON_GPU
     // Modifications for integrating CUDA kernels
     BinomialFilterType type;
 
@@ -214,8 +215,8 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
     else CudaConvolveXY(src, dst, type);
 
     printf("\nGPU convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+#else
 
-#if 0
     profilingTimer->startTimer();
     //VerifyComputedData(&tmpImg2.Pixel(0, 0, 0), &tmpImgCUDA.Pixel(0, 0, 0), 7003904);
 
@@ -229,8 +230,10 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
     profilingTimer->startTimer();
     // Downsample or copy
     // Skip decimate and recopy if not required
+#ifdef RUN_ON_GPU
     if (decimate != 1)
     {
+#endif
        for (int y = 0; y < dShape.height; y++)
        {
            T* sPtr = &tmpImg2.Pixel(0, y * decimate, 0);
@@ -244,7 +247,9 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
                dPtr += nB;
            }
        }
+#ifdef RUN_ON_GPU
     }
+#endif
     printf("\nDecimate/Recopy took = %f ms\n", profilingTimer->stopAndGetTimerValue());
 }
 

@@ -35,6 +35,7 @@
 #ifndef STEREOMATCHER_H
 #define STEREOMATCHER_H
 
+
 #include "Image.h"
 #include "StereoParameters.h"
 #include <time.h>

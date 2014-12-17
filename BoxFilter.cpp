@@ -187,6 +187,7 @@ extern void BoxFilter(CImageOf<T>& src, CImageOf<T>& dst,
     tmp.ReAllocate(sh);     // allocate memory for copy of src
     tmp.borderMode = src.borderMode;
 
+#ifdef RUN_ON_GPU
     if (average && (xWidth != 3) && (xWidth == BOX_WINDOW_SIZE))
     {
        // The above check is a temporary hack to easily switch between CPU and GPU code
@@ -199,6 +200,7 @@ extern void BoxFilter(CImageOf<T>& src, CImageOf<T>& dst,
     }
     else
     {
+#endif
        // Note: This part is still maintained for non-average / 3x3 Evaluation() which does not fall under core stereo vision implementation
 
        profilingTimer->startTimer();
@@ -230,7 +232,9 @@ extern void BoxFilter(CImageOf<T>& src, CImageOf<T>& dst,
        boxFilterLines(src_cols, dst_cols, n_bands*width, height, stride, w, pl, pr, dst.borderMode, average);
        
        printf("\nCPU Box filtering: Window Size: %d , Time = %f ms\n", xWidth, profilingTimer->stopAndGetTimerValue());
+#ifdef RUN_ON_GPU
     }
+#endif
 
 }
 

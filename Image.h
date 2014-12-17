@@ -32,6 +32,9 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+
+#define RUN_ON_GPU 1
+
 namespace std {}
 using namespace std;
 
