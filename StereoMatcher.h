@@ -32,6 +32,9 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef STEREOMATCHER_H
+#define STEREOMATCHER_H
+
 
 #include "Image.h"
 #include "StereoParameters.h"
@@ -163,5 +166,10 @@ protected:
     clock_t m_start_time;               // start of elapsed time interval
     float m_elapsed_time;               // elapsed time in seconds
 
+    float* RawCostsCPU();
+    float* RawCostsGPU();
+
     std::vector<CStereoFrame> m_frame;  // input/output images
 };
+
+#endif

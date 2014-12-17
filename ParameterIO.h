@@ -24,6 +24,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef PARAMETER_IO_H
+#define PARAMETER_IO_H
 
 #include <vector>
 
@@ -53,3 +55,5 @@ protected:
 #define PPPF(x)  PushParamPair(#x, "%f", &x)
 #define PPPD(x)  PushParamPair(#x, "%d", &x)
 #define PPPH(v)  PushParamPair(#v, "0x%08x", &v)
+
+#endif

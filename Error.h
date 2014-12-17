@@ -10,6 +10,8 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef ERROR_H
+#define ERROR_H
 
 namespace std {}
 using namespace std;
@@ -28,3 +30,5 @@ struct CError : public exception
             int d)                          { sprintf(message, fmt, s, d); }
     char message[1024];         // longest allowable message
 };
+
+#endif

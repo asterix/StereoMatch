@@ -29,6 +29,11 @@
 // See Copyright.h for more details
 //
 ///////////////////////////////////////////////////////////////////////////
+#ifndef IMAGE_H
+#define IMAGE_H
+
+
+#define RUN_ON_GPU 1
 
 namespace std {}
 using namespace std;
@@ -127,6 +132,9 @@ public:
     CShape Shape(void)              { return m_shape; }
     const type_info& PixType(void)  { return *m_pTI; }
     int BandSize(void)              { return m_bandSize; }
+    int RowSize(void)               { return m_rowSize; }
+    int PixSize(void)               { return m_pixSize; }
+    int ImageSize(void)             { return m_shape.height * m_rowSize; } // in bytes
 
     void* PixelAddress(int x, int y, int band);
 
@@ -251,3 +259,5 @@ struct RGBA
 {
     PixType B, G, R, A;     // A channel is highest one
 };
+
+#endif

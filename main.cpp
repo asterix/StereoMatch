@@ -21,10 +21,21 @@
 
 #include "Error.h"
 #include "StereoIO.h"
+#include "CudaUtilities.h"
+
+extern Timer* profilingTimer;
+extern Timer* profilingTimer2;
 
 int main(int argc, const char *argv[])
 {
     CStereoIO s;
+
+    // Initialization to work with CUDA capable GPU
+    prepareDevice();
+
+    profilingTimer = new Timer;
+    profilingTimer2 = new Timer;
+    
 
     try
     {
@@ -36,5 +47,10 @@ int main(int argc, const char *argv[])
         fprintf(stderr, "\n");
         return -1;
     }
+
+    // Clear allocated memory
+    delete profilingTimer;
+    delete profilingTimer2;
+
     return 0;
 }

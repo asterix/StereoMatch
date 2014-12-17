@@ -29,6 +29,10 @@
 #include "Error.h"
 #include "Convert.h"
 #include "Convolve.h"
+#include "CudaConvolve.h"
+#include "CudaUtilities.h"
+
+extern Timer* profilingTimer;
 
 static int TrimIndex(int k, EBorderMode e, int n)
 {
@@ -140,8 +144,7 @@ void Convolve(CImageOf<T> src, CImageOf<T>& dst,
     for (int y = 0; y < sShape.height; y++)
     {
         // Do the convolution
-        ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0),
-                      sShape.width);
+       ConvolveRow2D(buffer, kernel, &output.Pixel(0, 0, 0), sShape.width);
 
         // Scale, offset, and type convert
         ScaleAndOffsetLine(&output.Pixel(0, 0, 0), &dst.Pixel(0, y, 0),
@@ -177,6 +180,7 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
 
     // Allocate the intermediate images
     CImageOf<T> tmpImg1(src.Shape());
+    //CImageOf<T> tmpImgCUDA(src.Shape());
     CImageOf<T> tmpImg2(src.Shape());
 
     // Create a proper vertical convolution kernel
@@ -185,24 +189,68 @@ void ConvolveSeparable(CImageOf<T> src, CImageOf<T>& dst,
         v_kernel.Pixel(0, k, 0) = y_kernel.Pixel(k, 0, 0);
     v_kernel.origin[1] = y_kernel.origin[0];
 
+#ifdef RUN_ON_GPU
+    // Modifications for integrating CUDA kernels
+    BinomialFilterType type;
+
+    profilingTimer->startTimer();
+
+    // CUDA Convolve
+    switch (x_kernel.Shape().width)
+    {
+       case 3:
+           type = BINOMIAL6126;
+           break;
+       case 5:
+           type = BINOMIAL14641;
+           break;
+       default:
+           // Unsupported kernel case
+           throw CError("Convolution kernel Unknown");
+           assert(false);
+    }
+
+    // Skip copy if decimation is not required
+    if (decimate != 1) CudaConvolveXY(src, tmpImg2, type); 
+    else CudaConvolveXY(src, dst, type);
+
+    printf("\nGPU convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+#else
+
+    profilingTimer->startTimer();
+    //VerifyComputedData(&tmpImg2.Pixel(0, 0, 0), &tmpImgCUDA.Pixel(0, 0, 0), 7003904);
+
     // Perform the two convolutions
     Convolve(src, tmpImg1, x_kernel, 1.0f, 0.0f);
     Convolve(tmpImg1, tmpImg2, v_kernel, scale, offset);
 
+    printf("\nCPU Convolution time = %f ms\n", profilingTimer->stopAndGetTimerValue());
+#endif
+
+    profilingTimer->startTimer();
     // Downsample or copy
-    for (int y = 0; y < dShape.height; y++)
+    // Skip decimate and recopy if not required
+#ifdef RUN_ON_GPU
+    if (decimate != 1)
     {
-        T* sPtr = &tmpImg2.Pixel(0, y * decimate, 0);
-        T* dPtr = &dst.Pixel(0, y, 0);
-        int nB  = dShape.nBands;
-        for (int x = 0; x < dShape.width; x++)
-        {
-            for (int b = 0; b < nB; b++)
-                dPtr[b] = sPtr[b];
-            sPtr += decimate * nB;
-            dPtr += nB;
-        }
+#endif
+       for (int y = 0; y < dShape.height; y++)
+       {
+           T* sPtr = &tmpImg2.Pixel(0, y * decimate, 0);
+           T* dPtr = &dst.Pixel(0, y, 0);
+           int nB  = dShape.nBands;
+           for (int x = 0; x < dShape.width; x++)
+           {
+               for (int b = 0; b < nB; b++)
+                   dPtr[b] = sPtr[b];
+               sPtr += decimate * nB;
+               dPtr += nB;
+           }
+       }
+#ifdef RUN_ON_GPU
     }
+#endif
+    printf("\nDecimate/Recopy took = %f ms\n", profilingTimer->stopAndGetTimerValue());
 }
 
 template <class T>
