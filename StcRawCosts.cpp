@@ -60,8 +60,8 @@ extern Timer* profilingTimer;
 
 #define OPT1
 
-#define GPU (1)
-#define CPU (0)
+#define GPU (0)
+#define CPU (1)
 #define BOTH (0)
 
 static void InterpolateLine(int buf[], int s, int w, int nB,

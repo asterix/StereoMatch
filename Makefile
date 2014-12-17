@@ -205,8 +205,11 @@ CudaUtilities.o:CudaUtilities.cu
 CudaBoxFilter.o:CudaBoxFilter.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
+CudaRawCosts.o:CudaRawCosts.cu
+	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-OBJ = $(SRC:.cpp=.o) maxflow/maxflow.o CudaConvolve.o CudaUtilities.o CudaBoxFilter.o
+
+OBJ = $(SRC:.cpp=.o) maxflow/maxflow.o CudaConvolve.o CudaUtilities.o CudaBoxFilter.o CudaRawCosts.o
 StereoMatch: $(OBJ)
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
