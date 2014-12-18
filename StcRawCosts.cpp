@@ -194,6 +194,7 @@ float* CStereoMatcher::RawCostsCPU()
     if (verbose >= eVerboseProgress)
         fprintf(stderr, "\n");
 
+#if NUM_THREADS > 1
     std::vector<std::thread> threads;
     threads.resize(NUM_THREADS);
 
@@ -207,6 +208,9 @@ float* CStereoMatcher::RawCostsCPU()
         if (it->joinable())
             it->join();
     }
+#else
+    RawCostThread(0);
+#endif
 
     // join threads here
 
@@ -268,8 +272,13 @@ void CStereoMatcher::RawCostThread(int tid)
     cost1_vect.resize(cost_len);
 
     // Process all of the lines
+#if NUM_THREADS > 1
     int div = (int)ceil((float)h / (float)NUM_THREADS);
     int limit = __min((tid + 1) * div, h);
+#else
+    int div = 0;
+    int limit = h;
+#endif
     for (int y = div * tid; y < limit; y++)
     {
 
