@@ -29,7 +29,7 @@ extern Timer* profilingTimer2;
 
 // Serial / Parallel implementation
 
-__host__ __device__ void InterpolateLineCuda(int buf[], int s, int w, int nB, EStereoInterpFn match_interp)     // interpolation function
+__host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp)     // interpolation function
 {
     // Interpolate the missing values
     float si = 1.0f / s;
@@ -50,7 +50,7 @@ __host__ __device__ void InterpolateLineCuda(int buf[], int s, int w, int nB, ES
                 for (int is = 1; is < s; is++, sf += si)
                 {
                     v += nB;
-                    float Ii = CubicInterpolateCuda(sf, Im, I0, I1, Ip);
+                    float Ii = CubicInterpolateRC(sf, Im, I0, I1, Ip);
                     v[0] = int(Ii);
                 }
             }
@@ -68,7 +68,7 @@ __host__ __device__ void InterpolateLineCuda(int buf[], int s, int w, int nB, ES
     }
 }
 
-__host__ __device__ float CubicInterpolateCuda(float x0, float v0, float v1, float v2, float v3)
+__host__ __device__ float CubicInterpolateRC(float x0, float v0, float v1, float v2, float v3)
 {
     // See Szeliski & Ito, IEE Proc 133(6) 1986.
     float x1 = 1.0f - x0;
@@ -82,7 +82,7 @@ __host__ __device__ float CubicInterpolateCuda(float x0, float v0, float v1, flo
     return v;
 }
 
-__host__ __device__ void BirchfieldTomasiMinMaxCuda(const int* buffer, int* min_buf, int* max_buf, const int w, const int b)
+__host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b)
 {
     // Compute for every (interpolated) pixel, the minimum and maximum
     //  values in the two half-intervals before and after it
@@ -104,7 +104,7 @@ __host__ __device__ void BirchfieldTomasiMinMaxCuda(const int* buffer, int* min_
     }
 }
 
-__host__ __device__ void MatchLineCuda(MatchLineStruct args, float* cost, float* cost1)
+__host__ __device__ void MatchLine(MatchLineStruct args, float* cost, float* cost1)
 {
     // Set up the starting addresses, pointers, and cutoff value
     int n = (args.w - 1)*args.m_disp_den + 1;             // number of reference pixels
@@ -267,8 +267,8 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
         // Interpolate the matching signal
         if (args.m_disp_den > 1)
         {
-            InterpolateLineCuda(buf1, args.m_disp_den, args.w, args.b, args.match_interp);
-            InterpolateLineCuda(buf0, args.m_disp_den, args.w, args.b, args.match_interp);
+            InterpolateLine(buf1, args.m_disp_den, args.w, args.b, args.match_interp);
+            InterpolateLine(buf0, args.m_disp_den, args.w, args.b, args.match_interp);
         }
     }
     __syncthreads();
@@ -276,9 +276,9 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
     if (in_bounds)
     {
         if (args.match_interval) {
-            BirchfieldTomasiMinMaxCuda(buf1, min1, max1, args.n_interp, args.b);
+            BirchfieldTomasiMinMax(buf1, min1, max1, args.n_interp, args.b);
             if (args.match_interpolated)
-                BirchfieldTomasiMinMaxCuda(buf0, min0, max0, args.n_interp, args.b);
+                BirchfieldTomasiMinMax(buf0, min0, max0, args.n_interp, args.b);
         }
     }
     __syncthreads();
@@ -306,7 +306,7 @@ __global__ void LineProcessKernel(ImageStructUChar m_reference, ImageStructUChar
                 args.match_outside
             };
             
-            MatchLineCuda(lineArgs, PixelAddress(m_cost, 0, y, k), cost1);
+            MatchLine(lineArgs, PixelAddress(m_cost, 0, y, k), cost1);
         }
     }
 }

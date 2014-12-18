@@ -126,12 +126,12 @@ struct BufferStruct
 };
 
 // Raw Cost standard functions
-__host__ __device__ void InterpolateLineCuda(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
-__host__ __device__ void BirchfieldTomasiMinMaxCuda(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
-__host__ __device__ void MatchLineCuda(MatchLineStruct args, float* cost, float* cost1_in);
+__host__ __device__ void InterpolateLine(int buf[], int s, int w, int nB, EStereoInterpFn match_interp);
+__host__ __device__ void BirchfieldTomasiMinMax(const int* buffer, int* min_buf, int* max_buf, const int w, const int b);
+__host__ __device__ void MatchLine(MatchLineStruct args, float* cost, float* cost1_in);
 
 // Raw Cost helper functions
-__host__ __device__ float CubicInterpolateCuda(float x0, float v0, float v1, float v2, float v3);
+__host__ __device__ float CubicInterpolateRC(float x0, float v0, float v1, float v2, float v3);
 __device__ int PixelCoordToAbs(ImageSizeStruct size, int x, int y, int band);
 __device__ uchar* PixelAddress(ImageStructUChar image, int x, int y, int band);
 __device__ int* PixelAddress(ImageStructInt image, int x, int y, int band);

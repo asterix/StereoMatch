@@ -55,7 +55,7 @@
     <CodeAnalysisRuleAssemblies />
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='Win32'">
-    <OutDir>./win32/$(Configuration)/</OutDir>
+    <OutDir>./win32/$(Configuration)/imagedirs/Scripts/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <OutDir>../../bin/win64/$(Configuration)/</OutDir>
