@@ -134,13 +134,12 @@ static void MatchLine(int w, int b, int interpolated,
     int m_disp_n, int disp, int disp_den,
     EStereoMatchFn match_fn,  // matching function
     int match_max,            // maximum difference for truncated SAD/SSD
-    float match_outside)        // special value for outside match
+    float match_outside,        // special value for outside match
+    float* cost1)
 {
     // Set up the starting addresses, pointers, and cutoff value
     int n = (w - 1)*disp_den + 1;             // number of reference pixels
     int s = (interpolated) ? 1 : disp_den;     // skip in reference pixels
-    std::vector<float> cost1;
-    cost1.resize(n);
     int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
     // TODO:  cutoff is not adjusted for the number of bands...
     const float bad_cost = -1;
@@ -353,13 +352,16 @@ float* CStereoMatcher::RawCostsCPU()
     //  aren't using match_interpolated, but it's simpler to code this way.
     match_interval = (match_interval ? 1 : 0);  // force to [0,1]
     int n_interp = m_disp_den * (w - 1) + 1;
+    int n = (w - 1)*m_disp_den + 1;             // number of reference pixels
     std::vector<int> buffer0, buffer1, min_bf0, max_bf0, min_bf1, max_bf1;
+    std::vector<float> cost1;
     buffer0.resize(n_interp * b);
     buffer1.resize(n_interp * b);
     min_bf0.resize(n_interp * b);
     max_bf0.resize(n_interp * b);
     min_bf1.resize(n_interp * b);
     max_bf1.resize(n_interp * b);
+    cost1.resize(n);
 
     // Special value for border matches
     int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
@@ -412,7 +414,8 @@ float* CStereoMatcher::RawCostsCPU()
                 (match_interval) ? min1 : buf1,
                 (match_interval) ? max1 : 0,
                 cost, m_disp_n, disp, m_disp_den,
-                match_fn, match_max, m_match_outside);
+                match_fn, match_max, m_match_outside,
+                &cost1[0]);
         }
     }
     printf("\nCPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
