@@ -168,6 +168,7 @@ protected:
 
     float* RawCostsCPU();
     float* RawCostsGPU();
+    void RawCostThread(int tid);
 
     std::vector<CStereoFrame> m_frame;  // input/output images
 };

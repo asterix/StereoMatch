@@ -61,6 +61,8 @@ extern Timer* profilingTimer;
 
 #define OPT1
 
+#define NUM_THREADS (8) // optimal number of threads is the number of cores in the machine.
+
 #define GPU (0)
 #define CPU (1)
 #define BOTH (0)
@@ -176,10 +178,6 @@ float* CStereoMatcher::RawCostsCPU()
 {
     profilingTimer->startTimer();
 
-    // Compute raw per-pixel matching score between a pair of frames
-    CShape sh = m_reference.Shape();
-    int w = sh.width, h = sh.height, b = sh.nBands;
-
     if (verbose >= eVerboseProgress)
         fprintf(stderr, "- computing costs (cpu): ");
     if (verbose >= eVerboseSummary) {
@@ -196,92 +194,22 @@ float* CStereoMatcher::RawCostsCPU()
     if (verbose >= eVerboseProgress)
         fprintf(stderr, "\n");
 
-    // Allocate a buffer for interpolated values
-    //  Note that we don't have to interpolate the ref image if we
-    //  aren't using match_interpolated, but it's simpler to code this way.
-    match_interval = (match_interval ? 1 : 0);  // force to [0,1]
-    int n_interp = m_disp_den * (w - 1) + 1;
-    std::vector<int> buffer0, buffer1, min_bf0, max_bf0, min_bf1, max_bf1;
-    int buffer_length = n_interp * b;
-    buffer0.resize(buffer_length);
-    buffer1.resize(buffer_length);
-    min_bf0.resize(buffer_length);
-    max_bf0.resize(buffer_length);
-    min_bf1.resize(buffer_length);
-    max_bf1.resize(buffer_length);
+    std::vector<std::thread> threads;
+    threads.resize(NUM_THREADS);
 
-    int*  buf0 = &buffer0[0];
-    int*  buf1 = &buffer1[0];
-    int*  min0 = &min_bf0[0];
-    int*  max0 = &max_bf0[0];
-    int*  min1 = &min_bf1[0];
-    int*  max1 = &max_bf1[0];
-
-    int cost_len = (w - 1)*m_disp_den + 1;             // number of reference pixels
-    std::vector<float> cost1_vect;
-    cost1_vect.resize(cost_len);
-    float* cost1 = &cost1_vect[0];
-
-    // Special value for border matches
-    int worst_match = b * ((match_fn == eSD) ? 255 * 255 : 255);
-    int cutoff = (match_fn == eSD) ? match_max * match_max : abs(match_max);
-    m_match_outside = (float)__min(worst_match, cutoff);	// trim to cutoff
-
-    // Process all of the lines
-    for (int y = 0; y < h; y++)
+    for (int i = 0; i < NUM_THREADS; i++)
     {
-
-        uchar* ref = &m_reference.Pixel(0, y, 0);
-        uchar* mtc = &m_matching.Pixel(0, y, 0);
-
-        // Fill the line buffers
-        int x, l, m;
-        for (x = 0, l = 0, m = 0; x < w; x++, m += m_disp_den*b)
-        {
-            for (int k = 0; k < b; k++, l++)
-            {
-                buf0[m + k] = ref[l];
-                buf1[m + k] = mtc[l];
-            }
-        }
-
-        // Interpolate the matching signal
-        if (m_disp_den > 1)
-        {
-            InterpolateLine(buf1, m_disp_den, w, b, match_interp);
-            InterpolateLine(buf0, m_disp_den, w, b, match_interp);
-        }
-
-        if (match_interval) {
-            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b);
-            if (match_interpolated)
-                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b);
-        }
-
-        // Compute the costs, one disparity at a time
-
-        for (int k = 0; k < m_disp_n; k++)
-        {
-            int disp = -m_frame_diff_sign * (m_disp_den * disp_min + k * m_disp_num);
-
-            MatchLineStruct args = {
-                w,
-                b,
-                match_interpolated, //match_interpolated
-                (match_interval) ? (match_interpolated) ? min0 : buf0 : buf0, // rmn
-                (match_interval) ? (match_interpolated) ? max0 : buf0 : 0, // rmx
-                (match_interval) ? min1 : buf1, // mmn
-                (match_interval) ? max1 : 0, // mmx
-                m_disp_n,
-                disp,
-                m_disp_den,
-                match_fn,
-                match_max,
-                m_match_outside
-            };
-            MatchLine(args, &m_cost.Pixel(0, y, k), cost1);
-        }
+        threads.push_back(std::thread(&CStereoMatcher::RawCostThread, this, i));
     }
+
+    for (std::vector<std::thread>::iterator it = threads.begin(); it != threads.end(); ++it)
+    {
+        if (it->joinable())
+            it->join();
+    }
+
+    // join threads here
+
     printf("\nCPU Raw Costs: Time = %f ms\n", profilingTimer->stopAndGetTimerValue());
 
     // Write out the different disparity images
@@ -299,6 +227,103 @@ float* CStereoMatcher::RawCostsCPU()
     return NULL;
 
 #endif
+}
+
+void CStereoMatcher::RawCostThread(int tid)
+{
+    // Compute raw per-pixel matching score between a pair of frames
+    CShape sh = this->m_reference.Shape();
+    int w = sh.width, h = sh.height, b = sh.nBands;
+
+    // Allocate a buffer for interpolated values
+    //  Note that we don't have to interpolate the ref image if we
+    //  aren't using match_interpolated, but it's simpler to code this way.
+    this->match_interval = (this->match_interval ? 1 : 0);  // force to [0,1]
+    int n_interp = this->m_disp_den * (w - 1) + 1;
+
+    // Special value for border matches
+    int worst_match = b * ((this->match_fn == eSD) ? 255 * 255 : 255);
+    int cutoff = (this->match_fn == eSD) ? this->match_max * this->match_max : abs(this->match_max);
+    this->m_match_outside = (float)__min(worst_match, cutoff);	// trim to cutoff
+
+    int cost_len = (w - 1)*this->m_disp_den + 1;             // number of reference pixels
+
+    std::vector<int> buffer0, buffer1, min_bf0, max_bf0, min_bf1, max_bf1;
+    int buffer_length = n_interp * b;
+    buffer0.resize(buffer_length);
+    buffer1.resize(buffer_length);
+    min_bf0.resize(buffer_length);
+    max_bf0.resize(buffer_length);
+    min_bf1.resize(buffer_length);
+    max_bf1.resize(buffer_length);
+
+    int*  buf0 = &buffer0[0];
+    int*  buf1 = &buffer1[0];
+    int*  min0 = &min_bf0[0];
+    int*  max0 = &max_bf0[0];
+    int*  min1 = &min_bf1[0];
+    int*  max1 = &max_bf1[0];
+
+    std::vector<float> cost1_vect;
+    cost1_vect.resize(cost_len);
+
+    // Process all of the lines
+    int div = (int)ceil((float)h / (float)NUM_THREADS);
+    int limit = __min((tid + 1) * div, h);
+    for (int y = div * tid; y < limit; y++)
+    {
+
+        uchar* ref = &this->m_reference.Pixel(0, y, 0);
+        uchar* mtc = &this->m_matching.Pixel(0, y, 0);
+
+        // Fill the line buffers
+        int x, l, m;
+        for (x = 0, l = 0, m = 0; x < w; x++, m += this->m_disp_den*b)
+        {
+            for (int k = 0; k < b; k++, l++)
+            {
+                buf0[m + k] = ref[l];
+                buf1[m + k] = mtc[l];
+            }
+        }
+
+        // Interpolate the matching signal
+        if (this->m_disp_den > 1)
+        {
+            InterpolateLine(buf1, this->m_disp_den, w, b, this->match_interp);
+            InterpolateLine(buf0, this->m_disp_den, w, b, this->match_interp);
+        }
+
+        if (this->match_interval) {
+            BirchfieldTomasiMinMax(buf1, min1, max1, n_interp, b);
+            if (this->match_interpolated)
+                BirchfieldTomasiMinMax(buf0, min0, max0, n_interp, b);
+        }
+
+        // Compute the costs, one disparity at a time
+
+        for (int k = 0; k < this->m_disp_n; k++)
+        {
+            int disp = -this->m_frame_diff_sign * (this->m_disp_den * this->disp_min + k * this->m_disp_num);
+
+            MatchLineStruct args = {
+                w,
+                b,
+                this->match_interpolated, //match_interpolated
+                (this->match_interval) ? (this->match_interpolated) ? min0 : buf0 : buf0, // rmn
+                (this->match_interval) ? (this->match_interpolated) ? max0 : buf0 : 0, // rmx
+                (this->match_interval) ? min1 : buf1, // mmn
+                (this->match_interval) ? max1 : 0, // mmx
+                this->m_disp_n,
+                disp,
+                this->m_disp_den,
+                this->match_fn,
+                this->match_max,
+                this->m_match_outside
+            };
+            MatchLine(args, &this->m_cost.Pixel(0, y, k), &cost1_vect[0]);
+        }
+    }
 }
 
 
